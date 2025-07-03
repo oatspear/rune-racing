@@ -171,20 +171,6 @@ const Players = ({ game }: PlayersProps) => {
           g.beginFill(color)
           g.drawCircle(x, y, 18)
           g.endFill()
-          // Draw lane number for each player
-          g.lineStyle(0)
-          g.beginFill(0xffffff)
-          g.drawRect(x - 12, y + 22, 24, 18)
-          g.endFill()
-          g.lineStyle(0)
-          g.beginFill(0x000000)
-          g.drawRect(x - 11, y + 23, 22, 16)
-          g.endFill()
-          g.lineStyle(0)
-          g.beginFill(0xffffff)
-          g.endFill()
-          g.lineStyle(0)
-          // Pixi doesn't support text in Graphics, so use a placeholder for now
         })
       }}
     />
