@@ -1,228 +1,191 @@
-import {
-  Container,
-  Graphics,
-  PixiRef,
-  Sprite,
-  Stage,
-  useApp,
-  useTick,
-} from "@pixi/react"
-import { Texture } from "pixi.js"
-import { useEffect, useRef, useState } from "react"
+import { Graphics, Stage, useApp } from "@pixi/react"
+import { useEffect, useState } from "react"
 import { PlayerId } from "rune-sdk"
-
-import selectSoundAudio from "./assets/select.wav"
 import { GameState } from "./logic.ts"
 
-const selectSound = new Audio(selectSoundAudio)
+const NUM_LANES = 5
 
-function App() {
+const LANE_MARGIN = 50
+const PLAYER_Y_RATIO = 0.7 // 70% down the screen
+
+const App = () => {
   const [game, setGame] = useState<GameState>()
   const [yourPlayerId, setYourPlayerId] = useState<PlayerId | undefined>()
 
   useEffect(() => {
     Rune.initClient({
-      onChange: ({ game, action, yourPlayerId }) => {
+      onChange: ({ game, yourPlayerId }) => {
         setGame(game)
         setYourPlayerId(yourPlayerId)
-
-        if (action && action.name === "claimCell") selectSound.play()
       },
     })
   }, [])
 
-  if (!game) {
-    // Rune only shows your game after an onChange() so no need for loading screen
-    return
-  }
+  useEffect(() => {
+    // Handle swipe gestures and mouse drag for lane changes
+    let touchStartX = 0
+    let touchEndX = 0
+    let touchActive = false
+    let mouseStartX = 0
+    let mouseEndX = 0
+    let mouseActive = false
 
-  const { winCombo, lastMovePlayerId, playerIds, freeCells } = game
+    function onTouchStart(e: TouchEvent) {
+      if (e.touches.length === 1) {
+        touchActive = true
+        touchStartX = e.touches[0].clientX
+      }
+    }
+    function onTouchMove(e: TouchEvent) {
+      if (touchActive && e.touches.length === 1) {
+        touchEndX = e.touches[0].clientX
+      }
+    }
+    function onTouchEnd() {
+      if (!touchActive) return
+      const dx = touchEndX - touchStartX
+      if (Math.abs(dx) > 40) {
+        if (dx < 0) {
+          Rune.actions.turnLeft()
+        } else {
+          Rune.actions.turnRight()
+        }
+      }
+      touchActive = false
+      touchStartX = 0
+      touchEndX = 0
+    }
 
-  return (
-    <>
-      <div id="board">
-        <Stage options={{ backgroundAlpha: 0 }}>
-          <Board yourPlayerId={yourPlayerId} game={game} />
-        </Stage>
-      </div>
-      <ul id="playersSection">
-        {playerIds.map((playerId, index) => {
-          const player = Rune.getPlayerInfo(playerId)
+    function onMouseDown(e: MouseEvent) {
+      mouseActive = true
+      mouseStartX = e.clientX
+    }
+    function onMouseMove(e: MouseEvent) {
+      if (mouseActive) {
+        mouseEndX = e.clientX
+      }
+    }
+    function onMouseUp() {
+      if (!mouseActive) return
+      const dx = mouseEndX - mouseStartX
+      if (Math.abs(dx) > 40) {
+        if (dx < 0) {
+          Rune.actions.turnLeft()
+        } else {
+          Rune.actions.turnRight()
+        }
+      }
+      mouseActive = false
+      mouseStartX = 0
+      mouseEndX = 0
+    }
 
-          return (
-            <li
-              key={playerId}
-              data-player={index.toString()}
-              data-your-turn={String(
-                playerIds[index] !== lastMovePlayerId && !winCombo && freeCells
-              )}
-            >
-              <img src={player.avatarUrl} />
-              <span>
-                {player.displayName}
-                {player.playerId === yourPlayerId && (
-                  <span>
-                    <br />
-                    (You)
-                  </span>
-                )}
-              </span>
-            </li>
-          )
-        })}
-      </ul>
-    </>
-  )
-}
-
-type BoardProps = {
-  yourPlayerId?: PlayerId
-  game?: GameState
-}
-
-export function Board({ yourPlayerId, game }: BoardProps) {
-  const app = useApp()
-  app.resizeTo = document.getElementById("board") as HTMLElement
+    window.addEventListener("touchstart", onTouchStart)
+    window.addEventListener("touchmove", onTouchMove)
+    window.addEventListener("touchend", onTouchEnd)
+    window.addEventListener("mousedown", onMouseDown)
+    window.addEventListener("mousemove", onMouseMove)
+    window.addEventListener("mouseup", onMouseUp)
+    return () => {
+      window.removeEventListener("touchstart", onTouchStart)
+      window.removeEventListener("touchmove", onTouchMove)
+      window.removeEventListener("touchend", onTouchEnd)
+      window.removeEventListener("mousedown", onMouseDown)
+      window.removeEventListener("mousemove", onMouseMove)
+      window.removeEventListener("mouseup", onMouseUp)
+    }
+  }, [])
 
   if (!game) {
     return null
   }
 
-  const { cells, lastMovePlayerId, playerIds } = game
-
   return (
     <>
-      {cells.map((cell, index) => {
-        const x = index % 3
-        const y = Math.floor(index / 3)
-
-        if (cell) {
-          return (
-            <OccupiedSpace
-              x={x}
-              y={y}
-              side={playerIds.indexOf(cell) === 0 ? "x" : "o"}
-              key={index}
-            />
-          )
-        }
-
-        return (
-          <EmptySpace
-            x={x}
-            y={y}
-            canClaim={lastMovePlayerId !== yourPlayerId}
-            onpointerdown={() => Rune.actions.claimCell(index)}
-            key={index}
-          />
-        )
-      })}
-      <Grid />
+      <div id="board-container">
+        <Stage
+          options={{ backgroundAlpha: 0 }}
+          width={window.innerWidth}
+          height={window.innerHeight}
+        >
+          <RaceTrack />
+          <Players game={game} yourPlayerId={yourPlayerId} />
+        </Stage>
+      </div>
+      <div id="controls-hud">
+        <button onPointerDown={() => Rune.actions.accelerate()}>
+          Accelerate
+        </button>
+        <button onPointerDown={() => Rune.actions.turnLeft()}>Turn Left</button>
+        <button onPointerDown={() => Rune.actions.turnRight()}>
+          Turn Right
+        </button>
+      </div>
     </>
   )
 }
 
-function Grid() {
+const RaceTrack = () => {
   const app = useApp()
-
-  const width = app.view.width / devicePixelRatio
+  const width = app.screen.width
+  const height = app.screen.height
+  const laneWidth = (width - 2 * LANE_MARGIN) / NUM_LANES
 
   return (
     <Graphics
       draw={(g) => {
-        g.lineStyle(4, 0x555555)
-
-        for (let i = 1; i < 3; i++) {
-          g.moveTo(i * (width / 3), 0)
-          g.lineTo(i * (width / 3), width)
-          g.moveTo(0, i * (width / 3))
-          g.lineTo(width, i * (width / 3))
+        g.clear()
+        // Draw lanes
+        for (let i = 0; i <= NUM_LANES; i++) {
+          const x = LANE_MARGIN + i * laneWidth
+          g.lineStyle(i === 0 || i === NUM_LANES ? 6 : 2, 0x888888)
+          g.moveTo(x, 0)
+          g.lineTo(x, height)
         }
       }}
     />
   )
 }
 
-function OccupiedSpace({
-  x,
-  y,
-  side,
-}: {
-  x: number
-  y: number
-  side: "x" | "o"
-}) {
-  const app = useApp()
-  const spriteRef = useRef<PixiRef<typeof Sprite>>(null)
-  const width = app.view.width / devicePixelRatio / 3
-
-  useTick((delta) => {
-    if (spriteRef.current) {
-      if (spriteRef.current.width < width - 20) {
-        spriteRef.current.width += delta * 5
-        spriteRef.current.height += delta * 5
-      }
-    }
-  })
-
-  return (
-    <Sprite
-      ref={spriteRef}
-      image={`${side}.svg`}
-      width={0}
-      height={0}
-      x={width * x + width / 2}
-      y={width * y + width / 2}
-      anchor={0.5}
-    />
-  )
+type PlayersProps = {
+  game: GameState
+  yourPlayerId?: PlayerId
 }
 
-function EmptySpace({
-  x,
-  y,
-  canClaim,
-  onpointerdown,
-}: {
-  x: number
-  y: number
-  canClaim: boolean
-  onpointerdown: () => void
-}) {
-  const [hovering, setHovering] = useState(false)
+const Players = ({ game }: PlayersProps) => {
   const app = useApp()
-  const width = app.view.width / devicePixelRatio / 3
-
-  if (!canClaim) {
-    return null
-  }
-
-  return (
-    <Container x={width * x} y={width * y}>
-      {hovering && <Dot />}
-      <Sprite
-        interactive={true}
-        texture={Texture.EMPTY}
-        width={width}
-        height={width}
-        onpointerover={() => setHovering(true)}
-        onpointerout={() => setHovering(false)}
-        onpointerdown={onpointerdown}
-      />
-    </Container>
-  )
-}
-
-function Dot() {
-  const app = useApp()
-  const width = app.view.width / devicePixelRatio / 3
+  const width = app.screen.width
+  const height = app.screen.height
+  const laneWidth = (width - 2 * LANE_MARGIN) / NUM_LANES
 
   return (
     <Graphics
-      anchor={0.5}
+      key={JSON.stringify(game.players)}
       draw={(g) => {
-        g.beginFill(0xffffff)
-        g.drawCircle(width / 2, width / 2, 10)
+        g.clear()
+        Object.entries(game.players).forEach(([playerId, player]) => {
+          const lane = Math.max(0, Math.min(NUM_LANES - 1, player.position.x))
+          const x = LANE_MARGIN + laneWidth * (lane + 0.5)
+          const y = height * PLAYER_Y_RATIO
+          const color = parseInt(playerId.slice(-6), 16) || 0xff0000
+          g.beginFill(color)
+          g.drawCircle(x, y, 18)
+          g.endFill()
+          // Draw lane number for each player
+          g.lineStyle(0)
+          g.beginFill(0xffffff)
+          g.drawRect(x - 12, y + 22, 24, 18)
+          g.endFill()
+          g.lineStyle(0)
+          g.beginFill(0x000000)
+          g.drawRect(x - 11, y + 23, 22, 16)
+          g.endFill()
+          g.lineStyle(0)
+          g.beginFill(0xffffff)
+          g.endFill()
+          g.lineStyle(0)
+          // Pixi doesn't support text in Graphics, so use a placeholder for now
+        })
       }}
     />
   )
