@@ -1,13 +1,22 @@
 import { Graphics, Stage, useApp } from "@pixi/react"
 import { useEffect, useState } from "react"
 import { PlayerId } from "rune-sdk"
-import { GameState } from "./logic.ts"
+import { GameState, MAX_SPEED } from "./logic.ts"
 
 const NUM_LANES = 5
 const LANE_MARGIN = 50
-const PLAYER_FIXED_Y = 0.7 // Fixed vertical position for player's character
+const PLAYER_REST_Y = 0.7 // Position when at rest
+const PLAYER_MAX_SPEED_Y = 0.6 // Position when at top speed
 const VISIBLE_TRACK_HEIGHT = 240 // How much of track to show ahead/behind in game units
 const TRACK_LENGTH = 2400 // Import from logic.ts
+
+// Helper function to calculate player's screen position based on speed
+const getPlayerScreenY = (height: number, speed: number) => {
+  const speedRatio = speed / MAX_SPEED
+  const screenY =
+    PLAYER_REST_Y - (PLAYER_REST_Y - PLAYER_MAX_SPEED_Y) * speedRatio
+  return height * screenY
+}
 
 const RaceTrack = ({ game, yourPlayerId }: PlayersProps) => {
   const app = useApp()
@@ -126,21 +135,23 @@ const Players = ({ game, yourPlayerId }: PlayersProps) => {
           const relativeY = player.position.y - playerPos
           // Only draw if within visible range
           if (Math.abs(relativeY) <= VISIBLE_TRACK_HEIGHT / 2) {
-            const screenY =
-              height * (PLAYER_FIXED_Y - relativeY / VISIBLE_TRACK_HEIGHT)
+            const baseY = height * PLAYER_REST_Y
+            const screenY = baseY - (relativeY / VISIBLE_TRACK_HEIGHT) * height
+            // Adjust Y based on player's speed
+            const speedY = getPlayerScreenY(height, player.speed) - baseY
             const color = parseInt(playerId.slice(-6), 16) || 0xff0000
             g.beginFill(color)
-            g.drawCircle(x, screenY, 18)
+            g.drawCircle(x, screenY + speedY, 18)
             g.endFill()
           }
         })
 
-        // Draw current player last, at fixed position
+        // Draw current player last, at dynamic position based on speed
         if (yourPlayerId && game.players[yourPlayerId]) {
           const player = game.players[yourPlayerId]
           const lane = Math.max(0, Math.min(NUM_LANES - 1, player.position.x))
           const x = LANE_MARGIN + laneWidth * (lane + 0.5)
-          const y = height * PLAYER_FIXED_Y
+          const y = getPlayerScreenY(height, player.speed)
           const color = parseInt(yourPlayerId.slice(-6), 16) || 0xff0000
           g.beginFill(color)
           g.drawCircle(x, y, 18)
