@@ -4,9 +4,117 @@ import { PlayerId } from "rune-sdk"
 import { GameState } from "./logic.ts"
 
 const NUM_LANES = 5
-
 const LANE_MARGIN = 50
-const PLAYER_Y_RATIO = 0.7 // 70% down the screen
+const PLAYER_FIXED_Y = 0.7 // Fixed vertical position for player's character
+const VISIBLE_TRACK_HEIGHT = 240 // How much of track to show ahead/behind in game units
+
+const RaceTrack = ({ game, yourPlayerId }: PlayersProps) => {
+  const app = useApp()
+  const width = app.screen.width
+  const height = app.screen.height
+  const laneWidth = (width - 2 * LANE_MARGIN) / NUM_LANES
+
+  // If we're a player, get our position to offset the track
+  const playerPos =
+    (yourPlayerId && game.players[yourPlayerId]?.position.y) || 0
+
+  return (
+    <Graphics
+      key={`track-${playerPos}`}
+      draw={(g) => {
+        g.clear()
+
+        // Draw lanes
+        for (let i = 0; i <= NUM_LANES; i++) {
+          const x = LANE_MARGIN + i * laneWidth
+          g.lineStyle(i === 0 || i === NUM_LANES ? 6 : 2, 0x888888)
+          g.moveTo(x, 0)
+          g.lineTo(x, height)
+        }
+
+        // Draw horizontal track markers
+        const markerSpacing = 60 // Draw a line every 60 units
+        const screenBottom = playerPos - VISIBLE_TRACK_HEIGHT / 2
+        const screenTop = playerPos + VISIBLE_TRACK_HEIGHT / 2
+
+        const startMarker =
+          Math.floor(screenBottom / markerSpacing) * markerSpacing
+        const endMarker = Math.ceil(screenTop / markerSpacing) * markerSpacing
+
+        for (let y = startMarker; y <= endMarker; y += markerSpacing) {
+          const screenY =
+            height * (1 - (y - screenBottom) / VISIBLE_TRACK_HEIGHT)
+          g.lineStyle(2, 0x666666)
+          g.moveTo(LANE_MARGIN, screenY)
+          g.lineTo(width - LANE_MARGIN, screenY)
+
+          // Draw distance markers
+          g.lineStyle(0)
+          g.beginFill(0x666666)
+          g.drawRect(LANE_MARGIN - 40, screenY - 10, 30, 20)
+          g.endFill()
+        }
+      }}
+    />
+  )
+}
+
+type PlayersProps = {
+  game: GameState
+  yourPlayerId?: PlayerId
+}
+
+const Players = ({ game, yourPlayerId }: PlayersProps) => {
+  const app = useApp()
+  const width = app.screen.width
+  const height = app.screen.height
+  const laneWidth = (width - 2 * LANE_MARGIN) / NUM_LANES
+
+  // Get our player's position to calculate relative positions
+  const playerPos =
+    (yourPlayerId && game.players[yourPlayerId]?.position.y) || 0
+
+  return (
+    <Graphics
+      key={JSON.stringify(game.players)}
+      draw={(g) => {
+        g.clear()
+
+        // Draw other players first
+        Object.entries(game.players).forEach(([playerId, player]) => {
+          if (playerId === yourPlayerId) return // Skip current player
+
+          const lane = Math.max(0, Math.min(NUM_LANES - 1, player.position.x))
+          const x = LANE_MARGIN + laneWidth * (lane + 0.5)
+
+          // Calculate relative position from player
+          const relativeY = player.position.y - playerPos
+          // Only draw if within visible range
+          if (Math.abs(relativeY) <= VISIBLE_TRACK_HEIGHT / 2) {
+            const screenY =
+              height * (PLAYER_FIXED_Y - relativeY / VISIBLE_TRACK_HEIGHT)
+            const color = parseInt(playerId.slice(-6), 16) || 0xff0000
+            g.beginFill(color)
+            g.drawCircle(x, screenY, 18)
+            g.endFill()
+          }
+        })
+
+        // Draw current player last, at fixed position
+        if (yourPlayerId && game.players[yourPlayerId]) {
+          const player = game.players[yourPlayerId]
+          const lane = Math.max(0, Math.min(NUM_LANES - 1, player.position.x))
+          const x = LANE_MARGIN + laneWidth * (lane + 0.5)
+          const y = height * PLAYER_FIXED_Y
+          const color = parseInt(yourPlayerId.slice(-6), 16) || 0xff0000
+          g.beginFill(color)
+          g.drawCircle(x, y, 18)
+          g.endFill()
+        }
+      }}
+    />
+  )
+}
 
 const App = () => {
   const [game, setGame] = useState<GameState>()
@@ -108,72 +216,17 @@ const App = () => {
           width={window.innerWidth}
           height={window.innerHeight}
         >
-          <RaceTrack />
+          <RaceTrack game={game} yourPlayerId={yourPlayerId} />
           <Players game={game} yourPlayerId={yourPlayerId} />
         </Stage>
       </div>
       <div id="controls-hud">
-        <button onPointerDown={() => Rune.actions.accelerate()}>
-          Accelerate
-        </button>
         <button onPointerDown={() => Rune.actions.turnLeft()}>Turn Left</button>
         <button onPointerDown={() => Rune.actions.turnRight()}>
           Turn Right
         </button>
       </div>
     </>
-  )
-}
-
-const RaceTrack = () => {
-  const app = useApp()
-  const width = app.screen.width
-  const height = app.screen.height
-  const laneWidth = (width - 2 * LANE_MARGIN) / NUM_LANES
-
-  return (
-    <Graphics
-      draw={(g) => {
-        g.clear()
-        // Draw lanes
-        for (let i = 0; i <= NUM_LANES; i++) {
-          const x = LANE_MARGIN + i * laneWidth
-          g.lineStyle(i === 0 || i === NUM_LANES ? 6 : 2, 0x888888)
-          g.moveTo(x, 0)
-          g.lineTo(x, height)
-        }
-      }}
-    />
-  )
-}
-
-type PlayersProps = {
-  game: GameState
-  yourPlayerId?: PlayerId
-}
-
-const Players = ({ game }: PlayersProps) => {
-  const app = useApp()
-  const width = app.screen.width
-  const height = app.screen.height
-  const laneWidth = (width - 2 * LANE_MARGIN) / NUM_LANES
-
-  return (
-    <Graphics
-      key={JSON.stringify(game.players)}
-      draw={(g) => {
-        g.clear()
-        Object.entries(game.players).forEach(([playerId, player]) => {
-          const lane = Math.max(0, Math.min(NUM_LANES - 1, player.position.x))
-          const x = LANE_MARGIN + laneWidth * (lane + 0.5)
-          const y = height * PLAYER_Y_RATIO
-          const color = parseInt(playerId.slice(-6), 16) || 0xff0000
-          g.beginFill(color)
-          g.drawCircle(x, y, 18)
-          g.endFill()
-        })
-      }}
-    />
   )
 }
 

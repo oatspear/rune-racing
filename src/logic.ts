@@ -1,18 +1,24 @@
 import type { PlayerId, RuneClient } from "rune-sdk"
 
+const TRACK_LENGTH = 2400
+const PLAYER_SPEED = 240 // units per second
+
 export interface GameState {
   players: Record<
     PlayerId,
     {
-      position: { x: number; y: number }
+      position: {
+        x: number // lane index (0-4)
+        y: number // distance from start
+      }
       speed: number
     }
   >
   playerIds: PlayerId[]
+  lastUpdateTime: number
 }
 
 type GameActions = {
-  accelerate: () => void
   turnLeft: () => void
   turnRight: () => void
 }
@@ -24,6 +30,7 @@ declare global {
 Rune.initLogic({
   minPlayers: 2,
   maxPlayers: 4,
+  updatesPerSecond: 30,
   setup: (allPlayerIds) => {
     const players: Record<
       PlayerId,
@@ -31,27 +38,43 @@ Rune.initLogic({
     > = {}
 
     // Initialize all players at starting positions
-    allPlayerIds.forEach((playerId, index) => {
+    allPlayerIds.forEach((playerId) => {
       players[playerId] = {
-        position: { x: 0, y: 100 + index * 50 }, // Staggered start positions
-        speed: 0,
+        position: { x: 2, y: 0 }, // Start in middle lane
+        speed: PLAYER_SPEED,
       }
     })
 
     return {
       players,
       playerIds: allPlayerIds,
+      lastUpdateTime: Rune.gameTime(),
+    }
+  },
+  update: ({ game }) => {
+    const currentTime = Rune.gameTime()
+    const deltaTime = (currentTime - game.lastUpdateTime) / 1000 // Convert to seconds
+    game.lastUpdateTime = currentTime
+
+    // Update all players' positions using delta time
+    Object.values(game.players).forEach((player) => {
+      player.position.y += player.speed * deltaTime
+    })
+
+    // Check if any player has finished
+    const winners = Object.entries(game.players)
+      .filter(([, player]) => player.position.y >= TRACK_LENGTH)
+      .map(([playerId]) => playerId)
+
+    if (winners.length > 0) {
+      const results: Record<PlayerId, "WON" | "LOST"> = {}
+      game.playerIds.forEach((id) => {
+        results[id] = winners.includes(id) ? "WON" : "LOST"
+      })
+      Rune.gameOver({ players: results })
     }
   },
   actions: {
-    accelerate: (_params, { game, playerId }) => {
-      if (game.players[playerId]) {
-        game.players[playerId].speed = Math.min(
-          game.players[playerId].speed + 1,
-          10
-        )
-      }
-    },
     turnLeft: (_params, { game, playerId }) => {
       const player = game.players[playerId]
       if (player && player.position.x > 0) {
