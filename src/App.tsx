@@ -7,6 +7,7 @@ const NUM_LANES = 5
 const LANE_MARGIN = 50
 const PLAYER_FIXED_Y = 0.7 // Fixed vertical position for player's character
 const VISIBLE_TRACK_HEIGHT = 240 // How much of track to show ahead/behind in game units
+const TRACK_LENGTH = 2400 // Import from logic.ts
 
 const RaceTrack = ({ game, yourPlayerId }: PlayersProps) => {
   const app = useApp()
@@ -39,9 +40,16 @@ const RaceTrack = ({ game, yourPlayerId }: PlayersProps) => {
 
         const startMarker =
           Math.floor(screenBottom / markerSpacing) * markerSpacing
-        const endMarker = Math.ceil(screenTop / markerSpacing) * markerSpacing
+        const endMarker = Math.min(
+          Math.ceil(screenTop / markerSpacing) * markerSpacing,
+          TRACK_LENGTH // Don't draw markers beyond finish line
+        )
 
+        // Draw regular track markers
         for (let y = startMarker; y <= endMarker; y += markerSpacing) {
+          // Skip drawing if we're at the finish line
+          if (y === TRACK_LENGTH) continue
+
           const screenY =
             height * (1 - (y - screenBottom) / VISIBLE_TRACK_HEIGHT)
           g.lineStyle(2, 0x666666)
@@ -52,6 +60,33 @@ const RaceTrack = ({ game, yourPlayerId }: PlayersProps) => {
           g.lineStyle(0)
           g.beginFill(0x666666)
           g.drawRect(LANE_MARGIN - 40, screenY - 10, 30, 20)
+          g.endFill()
+        }
+
+        // Draw finish line if it's in view
+        if (TRACK_LENGTH >= screenBottom && TRACK_LENGTH <= screenTop) {
+          const finishY =
+            height * (1 - (TRACK_LENGTH - screenBottom) / VISIBLE_TRACK_HEIGHT)
+
+          // Draw checkered pattern
+          const checkerSize = 20
+          const numCheckers = Math.ceil((width - 2 * LANE_MARGIN) / checkerSize)
+
+          for (let i = 0; i < numCheckers; i++) {
+            const isEven = i % 2 === 0
+            g.beginFill(isEven ? 0xffffff : 0x000000)
+            g.drawRect(
+              LANE_MARGIN + i * checkerSize,
+              finishY - checkerSize / 2,
+              checkerSize,
+              checkerSize
+            )
+            g.endFill()
+          }
+
+          // Draw "FINISH" text background
+          g.beginFill(0xff0000)
+          g.drawRect(LANE_MARGIN - 80, finishY - 15, 70, 30)
           g.endFill()
         }
       }}

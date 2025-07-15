@@ -60,7 +60,10 @@ Rune.initLogic({
     // Update all players' speeds and positions using delta time
     Object.values(game.players).forEach((player) => {
       // Accelerate
-      player.speed = Math.min(MAX_SPEED, player.speed + ACCELERATION * deltaTime)
+      player.speed = Math.min(
+        MAX_SPEED,
+        player.speed + ACCELERATION * deltaTime
+      )
 
       // Update position based on current speed
       player.position.y += player.speed * deltaTime
@@ -68,7 +71,7 @@ Rune.initLogic({
 
     // Check if any player has finished
     const winners = Object.entries(game.players)
-      .filter(([, player]) => player.position.y >= TRACK_LENGTH)
+      .filter(([, player]) => player.position.y >= TRACK_LENGTH + MAX_SPEED)
       .map(([playerId]) => playerId)
 
     if (winners.length > 0) {
