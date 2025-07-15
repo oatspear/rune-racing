@@ -1,7 +1,8 @@
 import type { PlayerId, RuneClient } from "rune-sdk"
 
 const TRACK_LENGTH = 2400
-const PLAYER_SPEED = 240 // units per second
+const MAX_SPEED = 240 // units per second
+const ACCELERATION = MAX_SPEED / 1.5 // reach max speed in 1.5 seconds
 
 export interface GameState {
   players: Record<
@@ -37,11 +38,11 @@ Rune.initLogic({
       { position: { x: number; y: number }; speed: number }
     > = {}
 
-    // Initialize all players at starting positions
+    // Initialize all players at starting positions with zero speed
     allPlayerIds.forEach((playerId) => {
       players[playerId] = {
         position: { x: 2, y: 0 }, // Start in middle lane
-        speed: PLAYER_SPEED,
+        speed: 0, // Start from rest
       }
     })
 
@@ -56,8 +57,12 @@ Rune.initLogic({
     const deltaTime = (currentTime - game.lastUpdateTime) / 1000 // Convert to seconds
     game.lastUpdateTime = currentTime
 
-    // Update all players' positions using delta time
+    // Update all players' speeds and positions using delta time
     Object.values(game.players).forEach((player) => {
+      // Accelerate
+      player.speed = Math.min(MAX_SPEED, player.speed + ACCELERATION * deltaTime)
+
+      // Update position based on current speed
       player.position.y += player.speed * deltaTime
     })
 
