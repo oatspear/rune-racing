@@ -11,6 +11,13 @@ interface Pickup {
   collected: boolean
 }
 
+interface Obstacle {
+  id: number
+  lane: number
+  y: number
+  destroyed: boolean
+}
+
 export interface PlayerState {
   position: {
     x: number // lane index (0-4)
@@ -25,6 +32,7 @@ export interface GameState {
   playerIds: PlayerId[]
   lastUpdateTime: number
   pickups: Pickup[]
+  obstacles: Obstacle[]
 }
 
 type GameActions = {
@@ -77,11 +85,23 @@ Rune.initLogic({
       })
     }
 
+    // Create 8 obstacles along the track
+    const obstacles: Obstacle[] = []
+    for (let i = 0; i < 8; i++) {
+      obstacles.push({
+        id: i,
+        lane: Math.floor(Math.random() * 5), // Random lane 0-4
+        y: 400 + (TRACK_LENGTH - 800) * (i / 7), // Spread evenly, avoiding start/end and pickup zones
+        destroyed: false,
+      })
+    }
+
     return {
       players,
       playerIds: allPlayerIds,
       lastUpdateTime: Rune.gameTime(),
       pickups,
+      obstacles,
     }
   },
   update: ({ game }) => {
@@ -109,6 +129,18 @@ Rune.initLogic({
         ) {
           pickup.collected = true
           player.score += 1
+        }
+      })
+
+      // Check for obstacle collisions
+      game.obstacles.forEach((obstacle) => {
+        if (
+          !obstacle.destroyed &&
+          Math.abs(obstacle.y - player.position.y) < 20 && // Close enough on Y axis
+          obstacle.lane === player.position.x // In same lane
+        ) {
+          obstacle.destroyed = true
+          player.speed *= 0.5 // Reduce speed to half
         }
       })
     })

@@ -116,6 +116,25 @@ const RaceTrack = ({ game, yourPlayerId }: PlayersProps) => {
             g.endFill()
           }
         })
+
+        // Draw obstacles
+        game.obstacles.forEach((obstacle) => {
+          if (obstacle.destroyed) return // Skip destroyed obstacles
+
+          // Calculate obstacle screen position
+          const x = LANE_MARGIN + laneWidth * (obstacle.lane + 0.5)
+          const relativeY = obstacle.y - screenBottom
+          const screenY = height * (1 - relativeY / VISIBLE_TRACK_HEIGHT)
+
+          // Only draw if in visible range
+          if (screenY >= 0 && screenY <= height) {
+            g.lineStyle(2, 0xff4444) // Red outline
+            g.beginFill(0xff6666) // Light red fill
+            const size = 20
+            g.drawRect(x - size / 2, screenY - size / 2, size, size)
+            g.endFill()
+          }
+        })
       }}
     />
   )
