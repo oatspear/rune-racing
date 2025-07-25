@@ -1,5 +1,5 @@
 import { Graphics, Stage, useApp } from "@pixi/react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { PlayerId } from "rune-sdk"
 import { GameState, MAX_SPEED } from "./logic.ts"
 
@@ -108,11 +108,23 @@ type PlayersProps = {
   yourPlayerId?: PlayerId
 }
 
+type TrailPoint = {
+  lane: number // Store lane number instead of screen x
+  worldY: number // Store world y position
+  timestamp: number
+}
+
+type PlayerTrail = {
+  points: TrailPoint[]
+  lastUpdate: number
+}
+
 const Players = ({ game, yourPlayerId }: PlayersProps) => {
   const app = useApp()
   const width = app.screen.width
   const height = app.screen.height
   const laneWidth = (width - 2 * LANE_MARGIN) / NUM_LANES
+  const trailsRef = useRef<Record<PlayerId, PlayerTrail>>({})
 
   // Get our player's position to calculate relative positions
   const playerPos =
@@ -139,9 +151,79 @@ const Players = ({ game, yourPlayerId }: PlayersProps) => {
             const screenY = baseY - (relativeY / VISIBLE_TRACK_HEIGHT) * height
             // Adjust Y based on player's speed
             const speedY = getPlayerScreenY(height, player.speed) - baseY
+            const finalY = screenY + speedY
             const color = parseInt(playerId.slice(-6), 16) || 0xff0000
+
+            // Update trail points
+            const now = performance.now()
+            if (!trailsRef.current[playerId]) {
+              trailsRef.current[playerId] = {
+                points: [],
+                lastUpdate: now,
+              }
+            }
+
+            const trail = trailsRef.current[playerId]
+            const timeSinceLastUpdate = now - trail.lastUpdate
+
+            // Add new point if enough time has passed (every 32ms = ~30fps)
+            if (timeSinceLastUpdate > 32) {
+              trail.points.unshift({
+                lane: player.position.x,
+                worldY: player.position.y,
+                timestamp: now,
+              })
+              trail.lastUpdate = now
+              // Keep only last 12 points
+              if (trail.points.length > 12) {
+                trail.points.pop()
+              }
+            }
+
+            // Draw trail
+            if (trail.points.length > 1) {
+              g.lineStyle(0) // Reset line style
+              const points = trail.points
+
+              // Draw trail segments with gradual fade
+              for (let i = 0; i < points.length - 1; i++) {
+                const p1 = points[i]
+                const p2 = points[i + 1]
+                const age = (now - p1.timestamp) / 1000 // Convert to seconds
+                const alpha = Math.max(0, 1 - age) // Fade out over 1 second
+
+                // Calculate screen coordinates for both points
+                const x1 = LANE_MARGIN + laneWidth * (p1.lane + 0.5)
+                const x2 = LANE_MARGIN + laneWidth * (p2.lane + 0.5)
+
+                // Calculate relative positions from current player
+                const relY1 = p1.worldY - playerPos
+                const relY2 = p2.worldY - playerPos
+
+                // Convert to screen coordinates, with speed-based offset
+                const baseY = height * PLAYER_REST_Y
+                const speedY = getPlayerScreenY(height, player.speed) - baseY
+
+                const screenY1 =
+                  baseY - (relY1 / VISIBLE_TRACK_HEIGHT) * height + speedY
+                const screenY2 =
+                  baseY - (relY2 / VISIBLE_TRACK_HEIGHT) * height + speedY
+
+                // Draw the trail segment
+                g.lineStyle(
+                  Math.max(3, 20 * (1 - i / points.length)),
+                  color,
+                  alpha * 0.6
+                )
+                g.moveTo(x1, screenY1)
+                g.lineTo(x2, screenY2)
+              }
+            }
+
+            // Draw player
+            g.lineStyle(0)
             g.beginFill(color)
-            g.drawCircle(x, screenY + speedY, 18)
+            g.drawCircle(x, finalY, 18)
             g.endFill()
           }
         })
@@ -153,6 +235,75 @@ const Players = ({ game, yourPlayerId }: PlayersProps) => {
           const x = LANE_MARGIN + laneWidth * (lane + 0.5)
           const y = getPlayerScreenY(height, player.speed)
           const color = parseInt(yourPlayerId.slice(-6), 16) || 0xff0000
+
+          // Update trail points
+          const now = performance.now()
+          if (!trailsRef.current[yourPlayerId]) {
+            trailsRef.current[yourPlayerId] = {
+              points: [],
+              lastUpdate: now,
+            }
+          }
+
+          const trail = trailsRef.current[yourPlayerId]
+          const timeSinceLastUpdate = now - trail.lastUpdate
+
+          // Add new point if enough time has passed (every 32ms = ~30fps)
+          if (timeSinceLastUpdate > 32) {
+            trail.points.unshift({
+              lane: player.position.x,
+              worldY: player.position.y,
+              timestamp: now,
+            })
+            trail.lastUpdate = now
+            // Keep only last 12 points
+            if (trail.points.length > 12) {
+              trail.points.pop()
+            }
+          }
+
+          // Draw trail
+          if (trail.points.length > 1) {
+            g.lineStyle(0) // Reset line style
+            const points = trail.points
+
+            // Draw trail segments with gradual fade
+            for (let i = 0; i < points.length - 1; i++) {
+              const p1 = points[i]
+              const p2 = points[i + 1]
+              const age = (now - p1.timestamp) / 1000 // Convert to seconds
+              const alpha = Math.max(0, 1 - age) // Fade out over 1 second
+
+              // Calculate screen coordinates for both points
+              const x1 = LANE_MARGIN + laneWidth * (p1.lane + 0.5)
+              const x2 = LANE_MARGIN + laneWidth * (p2.lane + 0.5)
+
+              // Calculate relative positions from current player
+              const relY1 = p1.worldY - playerPos
+              const relY2 = p2.worldY - playerPos
+
+              // Convert to screen coordinates, with speed-based offset
+              const baseY = height * PLAYER_REST_Y
+              const speedY = getPlayerScreenY(height, player.speed) - baseY
+
+              const screenY1 =
+                baseY - (relY1 / VISIBLE_TRACK_HEIGHT) * height + speedY
+              const screenY2 =
+                baseY - (relY2 / VISIBLE_TRACK_HEIGHT) * height + speedY
+
+              // Draw the trail segment
+              g.lineStyle(
+                Math.max(3, 20 * (1 - i / points.length)),
+                color,
+                alpha * 0.6
+              )
+              g.moveTo(x1, screenY1)
+              g.lineTo(x2, screenY2)
+            }
+          }
+
+          // Draw player
+          g.lineStyle(0)
           g.beginFill(color)
           g.drawCircle(x, y, 18)
           g.endFill()
