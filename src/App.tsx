@@ -98,6 +98,24 @@ const RaceTrack = ({ game, yourPlayerId }: PlayersProps) => {
           g.drawRect(LANE_MARGIN - 80, finishY - 15, 70, 30)
           g.endFill()
         }
+
+        // Draw pickups
+        game.pickups.forEach((pickup) => {
+          if (pickup.collected) return // Skip collected pickups
+
+          // Calculate pickup screen position
+          const x = LANE_MARGIN + laneWidth * (pickup.lane + 0.5)
+          const relativeY = pickup.y - screenBottom
+          const screenY = height * (1 - relativeY / VISIBLE_TRACK_HEIGHT)
+
+          // Only draw if in visible range
+          if (screenY >= 0 && screenY <= height) {
+            g.lineStyle(0)
+            g.beginFill(0xffd700) // Gold color
+            g.drawCircle(x, screenY, 10)
+            g.endFill()
+          }
+        })
       }}
     />
   )
@@ -313,6 +331,42 @@ const Players = ({ game, yourPlayerId }: PlayersProps) => {
   )
 }
 
+const ScoreHUD = ({ game, yourPlayerId }: PlayersProps) => {
+  if (!yourPlayerId || !game.players[yourPlayerId]) return null
+
+  const player = game.players[yourPlayerId]
+  const color = `#${yourPlayerId.slice(-6)}`
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 20,
+        left: 20,
+        backgroundColor: "rgba(0, 0, 0, 0.7)",
+        padding: "10px",
+        borderRadius: "5px",
+        color: "white",
+        fontFamily: "Arial, sans-serif",
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+      }}
+    >
+      <span
+        style={{
+          display: "block",
+          width: "12px",
+          height: "12px",
+          borderRadius: "50%",
+          backgroundColor: color,
+        }}
+      />
+      <span>Pickups: {player.score}</span>
+    </div>
+  )
+}
+
 const App = () => {
   const [game, setGame] = useState<GameState>()
   const [yourPlayerId, setYourPlayerId] = useState<PlayerId | undefined>()
@@ -416,6 +470,7 @@ const App = () => {
           <RaceTrack game={game} yourPlayerId={yourPlayerId} />
           <Players game={game} yourPlayerId={yourPlayerId} />
         </Stage>
+        <ScoreHUD game={game} yourPlayerId={yourPlayerId} />
       </div>
       <div id="controls-hud">
         <button onPointerDown={() => Rune.actions.turnLeft()}>Turn Left</button>

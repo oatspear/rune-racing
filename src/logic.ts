@@ -4,19 +4,27 @@ const TRACK_LENGTH = 2400
 export const MAX_SPEED = 240 // units per second
 const ACCELERATION = MAX_SPEED / 1.5 // reach max speed in 1.5 seconds
 
+interface Pickup {
+  id: number
+  lane: number
+  y: number
+  collected: boolean
+}
+
+export interface PlayerState {
+  position: {
+    x: number // lane index (0-4)
+    y: number // distance from start
+  }
+  speed: number
+  score: number
+}
+
 export interface GameState {
-  players: Record<
-    PlayerId,
-    {
-      position: {
-        x: number // lane index (0-4)
-        y: number // distance from start
-      }
-      speed: number
-    }
-  >
+  players: Record<PlayerId, PlayerState>
   playerIds: PlayerId[]
   lastUpdateTime: number
+  pickups: Pickup[]
 }
 
 type GameActions = {
@@ -33,10 +41,7 @@ Rune.initLogic({
   maxPlayers: 4,
   updatesPerSecond: 30,
   setup: (allPlayerIds) => {
-    const players: Record<
-      PlayerId,
-      { position: { x: number; y: number }; speed: number }
-    > = {}
+    const players: Record<PlayerId, PlayerState> = {}
 
     // Initialize all players at starting positions with zero speed
     const lanes: number[] = [2, 2, 2, 2] // for each player
@@ -57,13 +62,26 @@ Rune.initLogic({
       players[playerId] = {
         position: { x: lanes.splice(0, 1)[0], y: -MAX_SPEED / 2 }, // Start in assigned lane
         speed: 0, // Start from rest
+        score: 0, // Start with no pickups collected
       }
     })
+
+    // Create 5 pickups along the track
+    const pickups: Pickup[] = []
+    for (let i = 0; i < 5; i++) {
+      pickups.push({
+        id: i,
+        lane: Math.floor(Math.random() * 5), // Random lane 0-4
+        y: 300 + (TRACK_LENGTH - 600) * (i / 4), // Spread evenly along track, avoiding start and end
+        collected: false,
+      })
+    }
 
     return {
       players,
       playerIds: allPlayerIds,
       lastUpdateTime: Rune.gameTime(),
+      pickups,
     }
   },
   update: ({ game }) => {
@@ -72,7 +90,7 @@ Rune.initLogic({
     game.lastUpdateTime = currentTime
 
     // Update all players' speeds and positions using delta time
-    Object.values(game.players).forEach((player) => {
+    Object.entries(game.players).forEach(([, player]) => {
       // Accelerate
       player.speed = Math.min(
         MAX_SPEED,
@@ -81,6 +99,18 @@ Rune.initLogic({
 
       // Update position based on current speed
       player.position.y += player.speed * deltaTime
+
+      // Check for pickup collisions
+      game.pickups.forEach((pickup) => {
+        if (
+          !pickup.collected &&
+          Math.abs(pickup.y - player.position.y) < 20 && // Close enough on Y axis
+          pickup.lane === player.position.x // In same lane
+        ) {
+          pickup.collected = true
+          player.score += 1
+        }
+      })
     })
 
     // Check if any player has finished
