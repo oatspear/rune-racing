@@ -3,6 +3,9 @@ import type { PlayerId, RuneClient } from "rune-sdk"
 const TRACK_LENGTH = 2400
 export const MAX_SPEED = 240 // units per second
 const ACCELERATION = MAX_SPEED / 1.5 // reach max speed in 1.5 seconds
+const PLAYER_REST_Y = 0.7 // Position when at rest
+const PLAYER_MAX_SPEED_Y = 0.6 // Position when at top speed
+const VISIBLE_TRACK_HEIGHT = 240 // How much of track to show ahead/behind
 
 interface Pickup {
   id: number
@@ -16,6 +19,7 @@ interface Obstacle {
   lane: number
   y: number
   destroyed: boolean
+  indestructible: boolean
 }
 
 export interface PlayerState {
@@ -25,6 +29,7 @@ export interface PlayerState {
   }
   speed: number
   score: number
+  knockbackEndTime?: number // When knockback effect should end
 }
 
 export interface GameState {
@@ -85,14 +90,28 @@ Rune.initLogic({
       })
     }
 
-    // Create 8 obstacles along the track
+    // Create obstacles along the track
     const obstacles: Obstacle[] = []
+
+    // Add 8 destructible obstacles
     for (let i = 0; i < 8; i++) {
       obstacles.push({
         id: i,
-        lane: Math.floor(Math.random() * 5), // Random lane 0-4
-        y: 400 + (TRACK_LENGTH - 800) * (i / 7), // Spread evenly, avoiding start/end and pickup zones
+        lane: 2, // Math.floor(Math.random() * 5), // Random lane 0-4
+        y: 420 + (TRACK_LENGTH - 800) * (i / 7), // Spread evenly, avoiding start/end and pickup zones
         destroyed: false,
+        indestructible: false,
+      })
+    }
+
+    // Add 8 indestructible obstacles
+    for (let i = 0; i < 8; i++) {
+      obstacles.push({
+        id: i + 8,
+        lane: 2, // Math.floor(Math.random() * 5), // Random lane 0-4
+        y: 400 + (TRACK_LENGTH - 800) * (i / 7), // Spread evenly, different spacing than destructibles
+        destroyed: false,
+        indestructible: true,
       })
     }
 
@@ -124,7 +143,7 @@ Rune.initLogic({
       game.pickups.forEach((pickup) => {
         if (
           !pickup.collected &&
-          Math.abs(pickup.y - player.position.y) < 20 && // Close enough on Y axis
+          Math.abs(pickup.y - player.position.y) < 26 && // Player radius (16) + pickup radius (10)
           pickup.lane === player.position.x // In same lane
         ) {
           pickup.collected = true
@@ -132,17 +151,36 @@ Rune.initLogic({
         }
       })
 
-      // Check for obstacle collisions
-      game.obstacles.forEach((obstacle) => {
-        if (
-          !obstacle.destroyed &&
-          Math.abs(obstacle.y - player.position.y) < 20 && // Close enough on Y axis
-          obstacle.lane === player.position.x // In same lane
-        ) {
-          obstacle.destroyed = true
-          player.speed *= 0.5 // Reduce speed to half
-        }
-      })
+      // Handle active knockback
+      if (player.knockbackEndTime && player.knockbackEndTime > currentTime) {
+        // During knockback, move backwards and slow down
+        const knockbackProgress = (player.knockbackEndTime - currentTime) / 500 // 0 to 1
+        player.speed = -MAX_SPEED * 0.3 * knockbackProgress // Negative speed = moving backwards
+      } else if (player.knockbackEndTime) {
+        // Knockback just ended
+        player.knockbackEndTime = undefined
+        player.speed = 0
+      }
+
+      // Check for obstacle collisions, but only if not in knockback
+      if (!player.knockbackEndTime) {
+        game.obstacles.forEach((obstacle) => {
+          // Simple collision check based on position and radius
+          if (
+            !obstacle.destroyed &&
+            Math.abs(obstacle.y - player.position.y) < 30 && // Player radius (16) + obstacle radius (10)
+            obstacle.lane === player.position.x // In same lane
+          ) {
+            if (obstacle.indestructible) {
+              // Start knockback
+              player.knockbackEndTime = currentTime + 500 // 500ms knockback
+            } else {
+              obstacle.destroyed = true
+              player.speed *= 0.5 // Reduce speed to half
+            }
+          }
+        })
+      }
     })
 
     // Check if any player has finished
@@ -161,14 +199,41 @@ Rune.initLogic({
   actions: {
     turnLeft: (_params, { game, playerId }) => {
       const player = game.players[playerId]
-      if (player && player.position.x > 0) {
-        player.position.x -= 1
+      if (!player || player.position.x <= 0 || player.knockbackEndTime) return
+
+      // Check for obstacles in target lane
+      const targetLane = player.position.x - 1
+      const speedRatio = player.speed / MAX_SPEED
+      const visualOffset =
+        (PLAYER_REST_Y - PLAYER_MAX_SPEED_Y) * speedRatio * VISIBLE_TRACK_HEIGHT
+
+      const hasObstacle = game.obstacles.some(
+        (obstacle) =>
+          !obstacle.destroyed &&
+          obstacle.lane === targetLane &&
+          Math.abs(obstacle.y - (player.position.y - visualOffset)) < 20
+      )
+
+      if (!hasObstacle) {
+        player.position.x = targetLane
       }
     },
     turnRight: (_params, { game, playerId }) => {
       const player = game.players[playerId]
-      if (player && player.position.x < 4) {
-        player.position.x += 1
+      if (!player || player.position.x >= 4 || player.knockbackEndTime) return
+
+      // Check for obstacles in target lane
+      const targetLane = player.position.x + 1
+
+      const hasObstacle = game.obstacles.some(
+        (obstacle) =>
+          !obstacle.destroyed &&
+          obstacle.lane === targetLane &&
+          Math.abs(obstacle.y - player.position.y) < 26 // Player radius (16) + obstacle radius (10)
+      )
+
+      if (!hasObstacle) {
+        player.position.x = targetLane
       }
     },
   },

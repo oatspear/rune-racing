@@ -44,8 +44,11 @@ const RaceTrack = ({ game, yourPlayerId }: PlayersProps) => {
 
         // Draw horizontal track markers
         const markerSpacing = 60 // Draw a line every 60 units
-        const screenBottom = playerPos - VISIBLE_TRACK_HEIGHT / 2
-        const screenTop = playerPos + VISIBLE_TRACK_HEIGHT / 2
+        // Adjust visible area based on player's position on screen
+        const visibleBehind = VISIBLE_TRACK_HEIGHT * PLAYER_REST_Y
+        const visibleAhead = VISIBLE_TRACK_HEIGHT * (1 - PLAYER_REST_Y)
+        const screenBottom = playerPos - visibleBehind
+        const screenTop = playerPos + visibleAhead
 
         const startMarker =
           Math.floor(screenBottom / markerSpacing) * markerSpacing
@@ -59,8 +62,10 @@ const RaceTrack = ({ game, yourPlayerId }: PlayersProps) => {
           // Skip drawing if we're at the finish line
           if (y === TRACK_LENGTH) continue
 
+          // Convert world Y to screen Y, accounting for player's screen position
+          const relativeY = y - playerPos
           const screenY =
-            height * (1 - (y - screenBottom) / VISIBLE_TRACK_HEIGHT)
+            height * PLAYER_REST_Y - (relativeY / VISIBLE_TRACK_HEIGHT) * height
           g.lineStyle(2, 0x666666)
           g.moveTo(LANE_MARGIN, screenY)
           g.lineTo(width - LANE_MARGIN, screenY)
@@ -105,14 +110,15 @@ const RaceTrack = ({ game, yourPlayerId }: PlayersProps) => {
 
           // Calculate pickup screen position
           const x = LANE_MARGIN + laneWidth * (pickup.lane + 0.5)
-          const relativeY = pickup.y - screenBottom
-          const screenY = height * (1 - relativeY / VISIBLE_TRACK_HEIGHT)
+          const relativeY = pickup.y - playerPos
+          const screenY =
+            height * PLAYER_REST_Y - (relativeY / VISIBLE_TRACK_HEIGHT) * height
 
           // Only draw if in visible range
           if (screenY >= 0 && screenY <= height) {
             g.lineStyle(0)
             g.beginFill(0xffd700) // Gold color
-            g.drawCircle(x, screenY, 10)
+            g.drawCircle(x, screenY, 10) // Pickup radius matches collision radius
             g.endFill()
           }
         })
@@ -123,16 +129,32 @@ const RaceTrack = ({ game, yourPlayerId }: PlayersProps) => {
 
           // Calculate obstacle screen position
           const x = LANE_MARGIN + laneWidth * (obstacle.lane + 0.5)
-          const relativeY = obstacle.y - screenBottom
-          const screenY = height * (1 - relativeY / VISIBLE_TRACK_HEIGHT)
+          const relativeY = obstacle.y - playerPos
+          const screenY =
+            height * PLAYER_REST_Y - (relativeY / VISIBLE_TRACK_HEIGHT) * height
 
           // Only draw if in visible range
           if (screenY >= 0 && screenY <= height) {
-            g.lineStyle(2, 0xff4444) // Red outline
-            g.beginFill(0xff6666) // Light red fill
-            const size = 20
-            g.drawRect(x - size / 2, screenY - size / 2, size, size)
-            g.endFill()
+            const size = 20 // Obstacle visual size matches collision radius (10 units radius = 20 units size)
+            if (obstacle.indestructible) {
+              // Steel-colored indestructible obstacle with thicker outline
+              g.lineStyle(3, 0x444444) // Dark gray outline
+              g.beginFill(0x888888) // Gray fill
+              g.drawRect(x - size / 2, screenY - size / 2, size, size)
+              // Add cross pattern to indicate indestructible
+              g.lineStyle(2, 0x444444)
+              g.moveTo(x - size / 3, screenY - size / 3)
+              g.lineTo(x + size / 3, screenY + size / 3)
+              g.moveTo(x + size / 3, screenY - size / 3)
+              g.lineTo(x - size / 3, screenY + size / 3)
+              g.endFill()
+            } else {
+              // Regular destructible obstacle
+              g.lineStyle(2, 0xff4444) // Red outline
+              g.beginFill(0xff6666) // Light red fill
+              g.drawRect(x - size / 2, screenY - size / 2, size, size)
+              g.endFill()
+            }
           }
         })
       }}
@@ -260,7 +282,7 @@ const Players = ({ game, yourPlayerId }: PlayersProps) => {
             // Draw player
             g.lineStyle(0)
             g.beginFill(color)
-            g.drawCircle(x, finalY, 18)
+            g.drawCircle(x, finalY, 16)
             g.endFill()
           }
         })
@@ -342,7 +364,7 @@ const Players = ({ game, yourPlayerId }: PlayersProps) => {
           // Draw player
           g.lineStyle(0)
           g.beginFill(color)
-          g.drawCircle(x, y, 18)
+          g.drawCircle(x, y, 16)
           g.endFill()
         }
       }}
