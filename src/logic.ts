@@ -3,9 +3,6 @@ import type { PlayerId, RuneClient } from "rune-sdk"
 const TRACK_LENGTH = 2400
 export const MAX_SPEED = 240 // units per second
 const ACCELERATION = MAX_SPEED / 1.5 // reach max speed in 1.5 seconds
-const PLAYER_REST_Y = 0.7 // Position when at rest
-const PLAYER_MAX_SPEED_Y = 0.6 // Position when at top speed
-const VISIBLE_TRACK_HEIGHT = 240 // How much of track to show ahead/behind
 
 interface Pickup {
   id: number
@@ -151,15 +148,16 @@ Rune.initLogic({
         }
       })
 
-      // Handle active knockback
-      if (player.knockbackEndTime && player.knockbackEndTime > currentTime) {
-        // During knockback, move backwards and slow down
-        const knockbackProgress = (player.knockbackEndTime - currentTime) / 500 // 0 to 1
-        player.speed = -MAX_SPEED * 0.3 * knockbackProgress // Negative speed = moving backwards
-      } else if (player.knockbackEndTime) {
-        // Knockback just ended
-        player.knockbackEndTime = undefined
-        player.speed = 0
+      // Handle knockback state
+      if (player.knockbackEndTime) {
+        if (player.knockbackEndTime > currentTime) {
+          // During knockback, player stays at knocked back position with zero speed
+          player.speed = 0
+        } else {
+          // Knockback just ended, resume from knocked back position
+          player.knockbackEndTime = undefined
+          player.speed = 0
+        }
       }
 
       // Check for obstacle collisions, but only if not in knockback
@@ -168,12 +166,14 @@ Rune.initLogic({
           // Simple collision check based on position and radius
           if (
             !obstacle.destroyed &&
-            Math.abs(obstacle.y - player.position.y) < 30 && // Player radius (16) + obstacle radius (10)
+            Math.abs(obstacle.y - player.position.y) < 26 && // Player radius (16) + obstacle radius (10)
             obstacle.lane === player.position.x // In same lane
           ) {
             if (obstacle.indestructible) {
-              // Start knockback
-              player.knockbackEndTime = currentTime + 500 // 500ms knockback
+              // Instantly move player back 40 units and stop them
+              player.position.y -= 40
+              player.speed = 0
+              player.knockbackEndTime = currentTime + 400 // 400ms recovery time
             } else {
               obstacle.destroyed = true
               player.speed *= 0.5 // Reduce speed to half
@@ -203,15 +203,12 @@ Rune.initLogic({
 
       // Check for obstacles in target lane
       const targetLane = player.position.x - 1
-      const speedRatio = player.speed / MAX_SPEED
-      const visualOffset =
-        (PLAYER_REST_Y - PLAYER_MAX_SPEED_Y) * speedRatio * VISIBLE_TRACK_HEIGHT
 
       const hasObstacle = game.obstacles.some(
         (obstacle) =>
           !obstacle.destroyed &&
           obstacle.lane === targetLane &&
-          Math.abs(obstacle.y - (player.position.y - visualOffset)) < 20
+          Math.abs(obstacle.y - player.position.y) < 26 // Player radius (16) + obstacle radius (10)
       )
 
       if (!hasObstacle) {

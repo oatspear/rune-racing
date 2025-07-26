@@ -12,7 +12,8 @@ const TRACK_LENGTH = 2400 // Import from logic.ts
 
 // Helper function to calculate player's screen position based on speed
 const getPlayerScreenY = (height: number, speed: number) => {
-  const speedRatio = speed / MAX_SPEED
+  // Only apply speed offset for forward movement to prevent visual glitches during knockback
+  const speedRatio = Math.max(0, speed) / MAX_SPEED
   const screenY =
     PLAYER_REST_Y - (PLAYER_REST_Y - PLAYER_MAX_SPEED_Y) * speedRatio
   return height * screenY
@@ -208,8 +209,11 @@ const Players = ({ game, yourPlayerId }: PlayersProps) => {
           if (Math.abs(relativeY) <= VISIBLE_TRACK_HEIGHT / 2) {
             const baseY = height * PLAYER_REST_Y
             const screenY = baseY - (relativeY / VISIBLE_TRACK_HEIGHT) * height
-            // Adjust Y based on player's speed
-            const speedY = getPlayerScreenY(height, player.speed) - baseY
+            // Calculate speed-based offset, but not during knockback
+            const speedY = player.knockbackEndTime
+              ? 0
+              : getPlayerScreenY(height, player.speed) - baseY
+            // If in knockback, smoothly animate to the new position
             const finalY = screenY + speedY
             const color = parseInt(playerId.slice(-6), 16) || 0xff0000
 
@@ -225,8 +229,8 @@ const Players = ({ game, yourPlayerId }: PlayersProps) => {
             const trail = trailsRef.current[playerId]
             const timeSinceLastUpdate = now - trail.lastUpdate
 
-            // Add new point if enough time has passed (every 32ms = ~30fps)
-            if (timeSinceLastUpdate > 32) {
+            // Add new point if enough time has passed and not in knockback
+            if (timeSinceLastUpdate > 32 && !player.knockbackEndTime) {
               trail.points.unshift({
                 lane: player.position.x,
                 worldY: player.position.y,
@@ -259,9 +263,12 @@ const Players = ({ game, yourPlayerId }: PlayersProps) => {
                 const relY1 = p1.worldY - playerPos
                 const relY2 = p2.worldY - playerPos
 
-                // Convert to screen coordinates, with speed-based offset
+                // Convert to screen coordinates
                 const baseY = height * PLAYER_REST_Y
-                const speedY = getPlayerScreenY(height, player.speed) - baseY
+                // Only apply speed offset if not in knockback
+                const speedY = player.knockbackEndTime
+                  ? 0
+                  : getPlayerScreenY(height, player.speed) - baseY
 
                 const screenY1 =
                   baseY - (relY1 / VISIBLE_TRACK_HEIGHT) * height + speedY
@@ -292,7 +299,10 @@ const Players = ({ game, yourPlayerId }: PlayersProps) => {
           const player = game.players[yourPlayerId]
           const lane = Math.max(0, Math.min(NUM_LANES - 1, player.position.x))
           const x = LANE_MARGIN + laneWidth * (lane + 0.5)
-          const y = getPlayerScreenY(height, player.speed)
+          // Base position with speed offset (but not during knockback)
+          const y = player.knockbackEndTime
+            ? height * PLAYER_REST_Y
+            : getPlayerScreenY(height, player.speed)
           const color = parseInt(yourPlayerId.slice(-6), 16) || 0xff0000
 
           // Update trail points
@@ -307,8 +317,8 @@ const Players = ({ game, yourPlayerId }: PlayersProps) => {
           const trail = trailsRef.current[yourPlayerId]
           const timeSinceLastUpdate = now - trail.lastUpdate
 
-          // Add new point if enough time has passed (every 32ms = ~30fps)
-          if (timeSinceLastUpdate > 32) {
+          // Add new point if enough time has passed and not in knockback
+          if (timeSinceLastUpdate > 32 && !player.knockbackEndTime) {
             trail.points.unshift({
               lane: player.position.x,
               worldY: player.position.y,
@@ -341,9 +351,12 @@ const Players = ({ game, yourPlayerId }: PlayersProps) => {
               const relY1 = p1.worldY - playerPos
               const relY2 = p2.worldY - playerPos
 
-              // Convert to screen coordinates, with speed-based offset
+              // Convert to screen coordinates
               const baseY = height * PLAYER_REST_Y
-              const speedY = getPlayerScreenY(height, player.speed) - baseY
+              // Only apply speed offset if not in knockback
+              const speedY = player.knockbackEndTime
+                ? 0
+                : getPlayerScreenY(height, player.speed) - baseY
 
               const screenY1 =
                 baseY - (relY1 / VISIBLE_TRACK_HEIGHT) * height + speedY
