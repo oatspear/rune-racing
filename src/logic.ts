@@ -27,6 +27,10 @@ export interface PlayerState {
   speed: number
   score: number
   knockbackEndTime?: number // When knockback effect should end
+  queuedAction?: {
+    type: "turnLeft" | "turnRight"
+    expireTime: number // When this queued action should be dropped
+  }
 }
 
 export interface GameState {
@@ -127,6 +131,30 @@ Rune.initLogic({
 
     // Update all players' speeds and positions using delta time
     Object.entries(game.players).forEach(([, player]) => {
+      // Try queued actions first if they exist
+      if (player.queuedAction && currentTime < player.queuedAction.expireTime) {
+        const targetLane =
+          player.queuedAction.type === "turnLeft"
+            ? player.position.x - 1
+            : player.position.x + 1
+
+        if (targetLane >= 0 && targetLane <= 4 && !player.knockbackEndTime) {
+          // Check for obstacles in target lane
+          const hasObstacle = game.obstacles.some(
+            (obstacle) =>
+              !obstacle.destroyed &&
+              obstacle.lane === targetLane &&
+              Math.abs(obstacle.y - player.position.y) < 26
+          )
+
+          if (!hasObstacle) {
+            player.position.x = targetLane
+            player.queuedAction = undefined // Clear the queue on successful move
+          }
+        }
+      } else if (player.queuedAction) {
+        player.queuedAction = undefined // Clear expired actions
+      }
       // Accelerate
       player.speed = Math.min(
         MAX_SPEED,
@@ -199,7 +227,19 @@ Rune.initLogic({
   actions: {
     turnLeft: (_params, { game, playerId }) => {
       const player = game.players[playerId]
-      if (!player || player.position.x <= 0 || player.knockbackEndTime) return
+      if (!player || player.position.x <= 0) return // Only check lane bounds
+
+      // Clear any existing queued action since player tried a new move
+      player.queuedAction = undefined
+
+      if (player.knockbackEndTime) {
+        // Queue the action if in knockback
+        player.queuedAction = {
+          type: "turnLeft",
+          expireTime: Rune.gameTime() + 180,
+        }
+        return
+      }
 
       // Check for obstacles in target lane
       const targetLane = player.position.x - 1
@@ -213,11 +253,29 @@ Rune.initLogic({
 
       if (!hasObstacle) {
         player.position.x = targetLane
+      } else {
+        // Queue the action if blocked by obstacle
+        player.queuedAction = {
+          type: "turnLeft",
+          expireTime: Rune.gameTime() + 180,
+        }
       }
     },
     turnRight: (_params, { game, playerId }) => {
       const player = game.players[playerId]
-      if (!player || player.position.x >= 4 || player.knockbackEndTime) return
+      if (!player || player.position.x >= 4) return // Only check lane bounds
+
+      // Clear any existing queued action since player tried a new move
+      player.queuedAction = undefined
+
+      if (player.knockbackEndTime) {
+        // Queue the action if in knockback
+        player.queuedAction = {
+          type: "turnRight",
+          expireTime: Rune.gameTime() + 180,
+        }
+        return
+      }
 
       // Check for obstacles in target lane
       const targetLane = player.position.x + 1
@@ -231,6 +289,12 @@ Rune.initLogic({
 
       if (!hasObstacle) {
         player.position.x = targetLane
+      } else {
+        // Queue the action if blocked by obstacle
+        player.queuedAction = {
+          type: "turnRight",
+          expireTime: Rune.gameTime() + 180,
+        }
       }
     },
   },
