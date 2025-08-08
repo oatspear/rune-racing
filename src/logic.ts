@@ -11,7 +11,7 @@ export const PLAYER_RADIUS = 10
 export const OBSTACLE_RADIUS = 10
 const COLLISION_THRESHOLD = PLAYER_RADIUS + OBSTACLE_RADIUS
 
-const QUEUED_ACTION_DURATION = 180
+const QUEUED_ACTION_DURATION = 250
 
 type Persisted = {
   sessionCount: number
@@ -158,68 +158,76 @@ function updatePlayer(
   currentTime: number,
   deltaTime: number
 ): void {
-  // Handle knockback state
-  if (player.knockbackEndTime) {
-    if (player.knockbackEndTime > currentTime) {
-      // During knockback, player stays at knocked back position with zero speed
-      player.speed = 0
-    } else {
-      // Knockback just ended, resume from knocked back position
-      player.knockbackEndTime = undefined
-      player.speed = 0
-    }
-  } else {
-    // Try queued actions first if they exist
-    if (player.queuedAction) {
-      if (currentTime >= player.queueExpireTime) {
-        player.queuedAction = PlayerAction.NONE // Clear expired actions
-      }
-      switch (player.queuedAction) {
-        case PlayerAction.TURN_LEFT:
-          turnLeft(game, playerId)
-          break
-        case PlayerAction.TURN_RIGHT:
-          turnRight(game, playerId)
-          break
-      }
-    }
-
-    // Accelerate
-    player.speed = Math.min(MAX_SPEED, player.speed + ACCELERATION * deltaTime)
-
-    // Update position based on current speed
-    player.y += player.speed * deltaTime
-  }
-
-  // Check for pickup collisions
-  for (let i = game.pickups.length - 1; i >= 0; i--) {
-    const pickup = game.pickups[i]
-    if (
-      Math.abs(pickup.y - player.y) < COLLISION_THRESHOLD &&
-      pickup.x === player.x
-    ) {
-      game.pickups.splice(i, 1)
-      player.score += 1
-    }
-  }
+  // Check for collisions before moving
+  let hasCollision = false
 
   // Check for obstacle collisions
   for (let i = game.obstacles.length - 1; i >= 0; i--) {
     const obstacle = game.obstacles[i]
-    // Simple collision check based on position and radius
     if (
       Math.abs(obstacle.y - player.y) < COLLISION_THRESHOLD &&
       obstacle.x === player.x
     ) {
+      hasCollision = true
       if (obstacle.indestructible) {
-        // Instantly move player back 40 units and stop them
-        player.y -= 40
+        // Indestructible obstacles cause knockback
+        const knockback =
+          PLAYER_RADIUS + PLAYER_RADIUS * (player.speed / MAX_SPEED)
         player.speed = 0
         player.knockbackEndTime = currentTime + 400 // 400ms recovery time
+        player.y = player.y - knockback
       } else {
         game.obstacles.splice(i, 1)
         player.speed *= 0.5 // Reduce speed to half
       }
+      break // Exit after first collision
+    }
+  }
+
+  // Only check pickups and update movement if no obstacle collision
+  if (!hasCollision) {
+    // Check for pickup collisions
+    for (let i = game.pickups.length - 1; i >= 0; i--) {
+      const pickup = game.pickups[i]
+      if (
+        Math.abs(pickup.y - player.y) < COLLISION_THRESHOLD &&
+        pickup.x === player.x
+      ) {
+        game.pickups.splice(i, 1)
+        player.score += 1
+      }
+    }
+
+    // Handle movement
+    if (player.knockbackEndTime && player.knockbackEndTime > currentTime) {
+      // During knockback, player stays at knocked back position with zero speed
+      player.speed = 0
+    } else if (player.knockbackEndTime) {
+      // Knockback just ended, resume from knocked back position
+      player.knockbackEndTime = undefined
+      player.speed = 0
+    } else {
+      // Try queued actions first if they exist
+      if (player.queuedAction) {
+        if (currentTime >= player.queueExpireTime) {
+          player.queuedAction = PlayerAction.NONE // Clear expired actions
+        }
+        switch (player.queuedAction) {
+          case PlayerAction.TURN_LEFT:
+            turnLeft(game, playerId)
+            break
+          case PlayerAction.TURN_RIGHT:
+            turnRight(game, playerId)
+            break
+        }
+      }
+
+      // Accelerate and move
+      player.speed = Math.min(
+        MAX_SPEED,
+        player.speed + ACCELERATION * deltaTime
+      )
+      player.y += player.speed * deltaTime
     }
   }
 }
