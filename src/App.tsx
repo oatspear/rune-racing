@@ -367,22 +367,41 @@ const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
               const screenY2 =
                 centerY - (relY2 / VISIBLE_TRACK_HEIGHT) * height + speedY
 
-              // Draw the trail segment
+              // Draw the trail segment with knockback fade
+              let trailAlpha = alpha * 0.6
+              if (player.knockbackEndTime) {
+                const knockbackProgress =
+                  (player.knockbackEndTime - performance.now()) / 400
+                const knockbackAlpha =
+                  Math.cos(knockbackProgress * Math.PI * 4) * 0.5 + 0.5
+                trailAlpha *= knockbackAlpha
+              }
+
               g.lineStyle(
                 Math.max(3, 20 * (1 - i / points.length)),
                 color,
-                alpha * 0.6
+                trailAlpha
               )
               g.moveTo(x1, screenY1)
               g.lineTo(x2, screenY2)
             }
           }
 
-          // Draw player
-          g.lineStyle(0)
-          g.beginFill(color)
+          // Draw player with blink effect during knockback
           const playerScreenRadius =
             (PLAYER_RADIUS / VISIBLE_TRACK_HEIGHT) * height
+
+          // Calculate blink alpha if in knockback
+          let alpha = 1
+          if (player.knockbackEndTime) {
+            // Blink twice per second during knockback
+            const knockbackProgress =
+              (player.knockbackEndTime - performance.now()) / 400
+            alpha = Math.cos(knockbackProgress * Math.PI * 4) * 0.5 + 0.5
+          }
+
+          g.lineStyle(0)
+          g.beginFill(color, alpha)
           g.drawCircle(x, y, playerScreenRadius)
           g.endFill()
         }
