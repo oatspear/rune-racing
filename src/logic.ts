@@ -7,8 +7,8 @@ const ACCELERATION = MAX_SPEED / 1.5 // reach max speed in 1.5 seconds
 export const NUM_LANES = 5 // Total lanes available (0-4)
 const MAX_LANE = NUM_LANES - 1 // Maximum lane index (4)
 
-const PLAYER_RADIUS = 16
-const OBSTACLE_RADIUS = 10
+export const PLAYER_RADIUS = 10
+export const OBSTACLE_RADIUS = 10
 const COLLISION_THRESHOLD = PLAYER_RADIUS + OBSTACLE_RADIUS
 
 const QUEUED_ACTION_DURATION = 180
