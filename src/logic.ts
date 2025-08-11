@@ -34,7 +34,15 @@ export enum PlayerAction {
   TURN_RIGHT,
 }
 
+export enum PlayableCharacter {
+  BLUE,
+  RED,
+  GREEN,
+  PURPLE,
+}
+
 export interface PlayerState {
+  character: PlayableCharacter
   x: number // lane index (0-4)
   y: number // distance from start
   speed: number
@@ -100,8 +108,17 @@ function setup(allPlayerIds: PlayerId[]): GameState {
     lanes[0] = 1 // Player 1 in second lane
     lanes[1] = 3 // Player 2 in fourth lane
   }
+  // randomly assign characters
+  const characters = [
+    PlayableCharacter.BLUE,
+    PlayableCharacter.RED,
+    PlayableCharacter.GREEN,
+    PlayableCharacter.PURPLE,
+  ]
+  characters.sort(() => Math.random() - 0.5)
   allPlayerIds.forEach((playerId) => {
     players[playerId] = {
+      character: characters.pop()!,
       x: lanes.splice(0, 1)[0], // Start in assigned lane
       y: -MAX_SPEED / 2,
       speed: 0, // Start from rest

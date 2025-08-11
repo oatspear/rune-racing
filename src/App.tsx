@@ -6,12 +6,20 @@ import {
   MAX_SPEED,
   PLAYER_RADIUS,
   OBSTACLE_RADIUS,
+  PlayableCharacter,
 } from "./logic.ts"
 
 const NUM_LANES = 5
 const LANE_MARGIN = 30
 const VISIBLE_TRACK_HEIGHT = 240 // How much of track to show ahead/behind in game units
 const TRACK_LENGTH = 2400
+
+const PLAYER_COLORS = {
+  [PlayableCharacter.BLUE]: 0x1e90ff, // Sapphire Blue
+  [PlayableCharacter.RED]: 0xc72c48, // Ruby Red
+  [PlayableCharacter.GREEN]: 0x50c878, // Emerald Green
+  [PlayableCharacter.PURPLE]: 0x800080, // Amethyst Purple
+}
 
 // Camera configuration shows 240 units of track height
 // Player is positioned at 4/6 from top of screen = 1/6 below center
@@ -215,7 +223,7 @@ const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
 
             const finalY =
               centerY - (relativeY / VISIBLE_TRACK_HEIGHT) * height + speedY
-            const color = parseInt(playerId.slice(-6), 16) || 0xff0000
+            const color = PLAYER_COLORS[player.character] || 0xffffff
 
             // Convert player size from game units to screen pixels
             const playerScreenRadius =
@@ -309,7 +317,7 @@ const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
             : (player.speed / MAX_SPEED) * 40
           const y =
             centerY - (relativeY / VISIBLE_TRACK_HEIGHT) * height + speedY
-          const color = parseInt(yourPlayerId.slice(-6), 16) || 0xff0000
+          const color = PLAYER_COLORS[player.character] || 0xffffff
 
           // Update trail points
           const now = performance.now()
