@@ -142,6 +142,7 @@ const App = () => {
         <button onPointerDown={() => Rune.actions.turnRight()}>
           Turn Right
         </button>
+        <button onPointerDown={() => Rune.actions.boostSpeed()}>Boost</button>
       </div>
     </>
   )

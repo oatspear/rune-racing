@@ -13,6 +13,7 @@ import type { PlayerId, RuneClient } from "rune-sdk"
 
 const TRACK_LENGTH = 2400
 export const MAX_SPEED = 240 // units per second
+export const BOOST_SPEED = MAX_SPEED * 1.5 // units per second
 const ACCELERATION = MAX_SPEED / 1.5 // reach max speed in 1.5 seconds
 
 export const NUM_LANES = 5 // Total lanes available (0-4)
@@ -61,6 +62,7 @@ export interface PlayerState {
   knockbackEndTime?: number // When knockback effect should end
   queuedAction: PlayerAction
   queueExpireTime: number // When this queued action should be dropped
+  boosting: boolean
 }
 
 export interface GameState {
@@ -95,6 +97,7 @@ function enqueueAction(action: PlayerAction, player: PlayerState): void {
 type GameActions = {
   turnLeft: () => void
   turnRight: () => void
+  boostSpeed: () => void
 }
 
 declare global {
@@ -137,6 +140,7 @@ function setup(allPlayerIds: PlayerId[]): GameState {
       knockbackEndTime: undefined, // No knockback at start
       queuedAction: PlayerAction.NONE, // No queued action at start
       queueExpireTime: 0, // No action expiration at start
+      boosting: false,
     }
   })
 
@@ -206,7 +210,9 @@ function updatePlayer(
         player.y = player.y - knockback
       } else {
         game.obstacles.splice(i, 1)
-        player.speed *= 0.5 // Reduce speed to half
+        if (!player.boosting) {
+          player.speed *= 0.5 // Reduce speed to half
+        }
       }
       break // Exit after first collision
     }
@@ -251,10 +257,14 @@ function updatePlayer(
       }
 
       // Accelerate and move
-      player.speed = Math.min(
-        MAX_SPEED,
-        player.speed + ACCELERATION * deltaTime
-      )
+      if (player.boosting) {
+        player.speed = BOOST_SPEED
+      } else {
+        player.speed = Math.min(
+          MAX_SPEED,
+          player.speed + ACCELERATION * deltaTime
+        )
+      }
       player.y += player.speed * deltaTime
     }
   }
@@ -332,6 +342,13 @@ function turnRight(game: GameState, playerId: PlayerId): void {
   }
 }
 
+function boostSpeed(game: GameState, playerId: PlayerId): void {
+  const player = game.players[playerId]
+  if (!player) return
+
+  player.boosting = !player.boosting // Toggle boosting state
+}
+
 Rune.initLogic({
   minPlayers: 2,
   maxPlayers: 4,
@@ -342,5 +359,6 @@ Rune.initLogic({
   actions: {
     turnLeft: (_params, { game, playerId }) => turnLeft(game, playerId),
     turnRight: (_params, { game, playerId }) => turnRight(game, playerId),
+    boostSpeed: (_params, { game, playerId }) => boostSpeed(game, playerId),
   },
 })
