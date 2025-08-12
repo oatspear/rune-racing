@@ -202,8 +202,23 @@ function drawPlayer(
   }
 
   // Draw player
-  g.lineStyle(0)
+  const outlineColor = 0x2c2c2c // Default outline color
+  g.lineStyle(3, outlineColor, alpha)
   g.beginFill(color, alpha)
   g.drawCircle(x, y, playerScreenRadius)
   g.endFill()
 }
+
+/*
+function lightenColor(color: number, factor: number): number {
+  const r = (color >> 16) & 0xff
+  const g = (color >> 8) & 0xff
+  const b = color & 0xff
+
+  const newR = Math.min(255, r + (255 - r) * factor)
+  const newG = Math.min(255, g + (255 - g) * factor)
+  const newB = Math.min(255, b + (255 - b) * factor)
+
+  return (newR << 16) | (newG << 8) | newB
+}
+*/

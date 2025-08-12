@@ -21,3 +21,10 @@ export const PLAYER_COLORS = {
   [PlayableCharacter.GREEN]: 0x50c878, // Emerald Green
   [PlayableCharacter.PURPLE]: 0x800080, // Amethyst Purple
 }
+
+export const PLAYER_OUTLINE_COLORS = {
+  [PlayableCharacter.BLUE]: 0xffc0cb, // Pastel Yellow
+  [PlayableCharacter.RED]: 0x2c2c2c, // Almost Black
+  [PlayableCharacter.GREEN]: 0xfafafa, // Almost White
+  [PlayableCharacter.PURPLE]: 0xff00ff, // Neon Pink
+}
