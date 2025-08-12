@@ -8,6 +8,7 @@
 import { PlayerId } from "rune-sdk"
 import {
   GameState,
+  KNOCKBACK_RECOVERY_TIME_MS,
   MAX_SPEED,
   NUM_LANES,
   PLAYER_RADIUS,
@@ -77,7 +78,7 @@ const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
           if (playerId === yourPlayerId) continue // Skip current player
           const trail = trailsRef.current[playerId]
           updateTrail(trail, player, now)
-          drawPlayer(g, player, cameraY, height, laneWidth, centerY, trail)
+          drawPlayer(g, player, cameraY, height, laneWidth, centerY, trail, now)
         }
 
         // Draw current player last, at dynamic position based on speed
@@ -85,7 +86,7 @@ const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
           const player = game.players[yourPlayerId]
           const trail = trailsRef.current[yourPlayerId]
           updateTrail(trail, player, now)
-          drawPlayer(g, player, cameraY, height, laneWidth, centerY, trail)
+          drawPlayer(g, player, cameraY, height, laneWidth, centerY, trail, now)
         }
       }}
     />
@@ -113,6 +114,8 @@ function updateTrail(trail: PlayerTrail, player: PlayerState, now: number) {
     if (trail.points.length > 12) {
       trail.points.pop()
     }
+  } else if (player.knockbackEndTime) {
+    trail.points.length = 0 // Clear trail during knockback
   }
 }
 
@@ -123,7 +126,8 @@ function drawPlayer(
   height: number,
   laneWidth: number,
   centerY: number,
-  trail: PlayerTrail
+  trail: PlayerTrail,
+  now: number
 ) {
   const lane = Math.max(0, Math.min(NUM_LANES - 1, player.x))
   const x = LANE_MARGIN + laneWidth * (lane + 0.5)
@@ -136,24 +140,33 @@ function drawPlayer(
     return
   }
 
-  const speedY = player.knockbackEndTime ? 0 : (player.speed / MAX_SPEED) * 40
-  const y = centerY - (relativeY / VISIBLE_TRACK_HEIGHT) * height + speedY
-  const color = PLAYER_COLORS[player.character] || 0xffffff
+  let speedY = 0
+  let knockbackProgress = 0
+  let alpha = 1
 
-  // Update trail points
-  const now = performance.now()
+  if (player.knockbackEndTime) {
+    knockbackProgress =
+      (player.knockbackEndTime - now) / KNOCKBACK_RECOVERY_TIME_MS
+    alpha = Math.cos(knockbackProgress * Math.PI * 4) * 0.5 + 0.5
+  } else {
+    speedY = player.boosting ? 40 : (player.speed / MAX_SPEED) * 40
+  }
+
+  const y = centerY - (relativeY / VISIBLE_TRACK_HEIGHT) * height + speedY
+  let color = PLAYER_COLORS[player.character] || 0x202020
+  if (player.boosting) {
+    color = lightenColor(color, 0.5) // Lighten color when boosting
+  }
 
   // Draw trail
-  if (trail.points.length > 1) {
+  if (trail.points.length > 1 && !player.knockbackEndTime) {
     g.lineStyle(0) // Reset line style
     const points = trail.points
+    let p1 = { lane: player.x, worldY: player.y, timestamp: 0 }
 
     // Draw trail segments with gradual fade
-    for (let i = 0; i < points.length - 1; i++) {
-      const p1 = points[i]
-      const p2 = points[i + 1]
-      const age = (now - p1.timestamp) / 1000 // Convert to seconds
-      const alpha = Math.max(0, 1 - age) // Fade out over 1 second
+    for (let i = 0; i < points.length; i++) {
+      const p2 = points[i]
 
       // Calculate screen coordinates for both points
       const x1 = LANE_MARGIN + laneWidth * (p1.lane + 0.5)
@@ -163,53 +176,52 @@ function drawPlayer(
       const relY1 = p1.worldY - cameraY
       const relY2 = p2.worldY - cameraY
 
-      // Convert to screen coordinates with speed offset
-      const speedY = player.knockbackEndTime
-        ? 0
-        : (player.speed / MAX_SPEED) * 40
-
       const screenY1 =
         centerY - (relY1 / VISIBLE_TRACK_HEIGHT) * height + speedY
       const screenY2 =
         centerY - (relY2 / VISIBLE_TRACK_HEIGHT) * height + speedY
 
       // Draw the trail segment with knockback fade
-      let trailAlpha = alpha * 0.6
+      const age = (now - p1.timestamp) / 1000 // Convert to seconds
+      let trailAlpha = Math.max(0, 1 - age) // Fade out over 1 second
+      if (!player.boosting) {
+        trailAlpha *= 0.6 // Non-boosting players have dimmer trails
+      }
       if (player.knockbackEndTime) {
-        const knockbackProgress =
-          (player.knockbackEndTime - performance.now()) / 400
-        const knockbackAlpha =
-          Math.cos(knockbackProgress * Math.PI * 4) * 0.5 + 0.5
-        trailAlpha *= knockbackAlpha
+        trailAlpha *= alpha
       }
 
-      g.lineStyle(Math.max(3, 20 * (1 - i / points.length)), color, trailAlpha)
+      let trailWidth = Math.max(3, 20 * (1 - i / points.length))
+      if (player.boosting) {
+        trailWidth *= 1.25
+      }
+      g.lineStyle(trailWidth, color, trailAlpha)
       g.moveTo(x1, screenY1)
       g.lineTo(x2, screenY2)
+      p1 = p2
     }
   }
 
   // Draw player with blink effect during knockback
   const playerScreenRadius = (PLAYER_RADIUS / VISIBLE_TRACK_HEIGHT) * height
 
-  // Calculate blink alpha if in knockback
-  let alpha = 1
-  if (player.knockbackEndTime) {
-    // Blink twice per second during knockback
-    const knockbackProgress =
-      (player.knockbackEndTime - performance.now()) / 400
-    alpha = Math.cos(knockbackProgress * Math.PI * 4) * 0.5 + 0.5
-  }
-
   // Draw player
   const outlineColor = 0x2c2c2c // Default outline color
   g.lineStyle(3, outlineColor, alpha)
   g.beginFill(color, alpha)
-  g.drawCircle(x, y, playerScreenRadius)
+  // g.drawCircle(x, y, playerScreenRadius)
+  // draw player as a triangle
+  g.drawPolygon([
+    x,
+    y - playerScreenRadius,
+    x - playerScreenRadius,
+    y + playerScreenRadius,
+    x + playerScreenRadius,
+    y + playerScreenRadius,
+  ])
   g.endFill()
 }
 
-/*
 function lightenColor(color: number, factor: number): number {
   const r = (color >> 16) & 0xff
   const g = (color >> 8) & 0xff
@@ -221,4 +233,3 @@ function lightenColor(color: number, factor: number): number {
 
   return (newR << 16) | (newG << 8) | newB
 }
-*/

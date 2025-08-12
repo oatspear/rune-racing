@@ -25,6 +25,8 @@ const COLLISION_THRESHOLD = PLAYER_RADIUS + OBSTACLE_RADIUS
 
 const QUEUED_ACTION_DURATION = 250
 
+export const KNOCKBACK_RECOVERY_TIME_MS = 400 // ms
+
 type Persisted = {
   sessionCount: number
 }
@@ -206,7 +208,7 @@ function updatePlayer(
         const knockback =
           PLAYER_RADIUS + PLAYER_RADIUS * (player.speed / MAX_SPEED)
         player.speed = 0
-        player.knockbackEndTime = currentTime + 400 // 400ms recovery time
+        player.knockbackEndTime = currentTime + KNOCKBACK_RECOVERY_TIME_MS
         player.y = player.y - knockback
       } else {
         game.obstacles.splice(i, 1)
