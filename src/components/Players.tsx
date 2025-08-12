@@ -16,7 +16,11 @@ import {
 import { Graphics, useApp } from "@pixi/react"
 import { Graphics as PixiGraphics } from "pixi.js"
 import { useRef } from "react"
-import { LANE_MARGIN, PLAYER_COLORS, VISIBLE_TRACK_HEIGHT } from "../client_constants"
+import {
+  LANE_MARGIN,
+  PLAYER_COLORS,
+  VISIBLE_TRACK_HEIGHT,
+} from "../client_constants"
 
 // -----------------------------------------------------------------------------
 // Constants
