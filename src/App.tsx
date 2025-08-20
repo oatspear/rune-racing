@@ -13,50 +13,24 @@ import Players from "./components/Players.tsx"
 import { VISIBLE_TRACK_HEIGHT } from "./client_constants.ts"
 import ScoreHUD from "./components/ScoreHUD.tsx"
 import RaceTrack from "./components/RaceTrack.tsx"
-import StrikeNotification from "./components/StrikeNotification.tsx"
+// import Notifications from "./components/Notifications.tsx"
 
 // -----------------------------------------------------------------------------
 // Component
 // -----------------------------------------------------------------------------
 
-interface NotificationState {
-  strikerId: PlayerId
-  targetId: PlayerId
-  strikeTimestamp: number
-}
-
 const App = () => {
   const [game, setGame] = useState<GameState>()
   const [yourPlayerId, setYourPlayerId] = useState<PlayerId | undefined>()
-  const [notification, setNotification] = useState<NotificationState | null>(
-    null
-  )
 
   useEffect(() => {
     Rune.initClient({
       onChange: ({ game, yourPlayerId }) => {
         setGame(game)
         setYourPlayerId(yourPlayerId)
-
-        // Handle strike notifications
-        if (game?.lastStrike) {
-          const { strikerId, targetId, timestamp } = game.lastStrike
-          // Only show notification if we're involved and it's a new strike
-          if (
-            yourPlayerId &&
-            (strikerId === yourPlayerId || targetId === yourPlayerId) &&
-            (!notification || notification.strikeTimestamp !== timestamp)
-          ) {
-            setNotification({
-              strikerId,
-              targetId,
-              strikeTimestamp: timestamp,
-            })
-          }
-        }
       },
     })
-  }, [notification])
+  }, [])
 
   // Calculate camera position based on player position
   const cameraY = useMemo(() => {
@@ -164,25 +138,11 @@ const App = () => {
         </Stage>
         <ScoreHUD game={game} yourPlayerId={yourPlayerId} />
 
-        {/* Notifications container */}
-        <div className="notifications-container">
-          {/* Strike target notification */}
-          {notification && yourPlayerId === notification.targetId && (
-            <StrikeNotification
-              type="target"
-              playerId={notification.strikerId}
-              onComplete={() => setNotification(null)}
-            />
-          )}
-          {/* Strike success notification */}
-          {notification && yourPlayerId === notification.strikerId && (
-            <StrikeNotification
-              type="striker"
-              playerId={notification.targetId}
-              onComplete={() => setNotification(null)}
-            />
-          )}
-        </div>
+        {/* <Notifications
+          currentTime={Rune.gameTime()}
+          yourPlayerId={yourPlayerId}
+          strikeEvent={game.lastStrike}
+        /> */}
       </div>
       <div id="controls-hud">
         <div className="control-buttons">

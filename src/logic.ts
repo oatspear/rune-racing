@@ -80,7 +80,7 @@ export interface PlayerState extends Position2D {
   lastStrikeTime?: number // Timestamp of last strike used (for cooldown)
 }
 
-interface StrikeEvent {
+export interface StrikeEvent {
   strikerId: PlayerId
   targetId: PlayerId
   timestamp: number
