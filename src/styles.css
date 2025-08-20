@@ -78,3 +78,28 @@ main {
     background-color: #5a5a5a;
   }
 }
+
+.notifications-container {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 100;
+}
+
+.strike-notification {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 8px;
+  padding: 0.5rem;
+}
+
+.character-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}

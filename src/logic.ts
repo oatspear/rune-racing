@@ -80,12 +80,19 @@ export interface PlayerState extends Position2D {
   lastStrikeTime?: number // Timestamp of last strike used (for cooldown)
 }
 
+interface StrikeEvent {
+  strikerId: PlayerId
+  targetId: PlayerId
+  timestamp: number
+}
+
 export interface GameState {
   players: Record<PlayerId, PlayerState>
   playerIds: PlayerId[]
   lastUpdateTime: number
   pickups: Pickup[]
   obstacles: Obstacle[]
+  lastStrike?: StrikeEvent
 }
 
 // -----------------------------------------------------------------------------
@@ -427,6 +434,19 @@ function strike(game: GameState, playerId: PlayerId): void {
   if (closestTarget) {
     applyKnockback(closestTarget, currentTime)
     player.lastStrikeTime = currentTime
+
+    // Find the target's ID
+    const targetId = Object.entries(game.players).find(
+      ([, p]) => p === closestTarget
+    )?.[0]
+
+    if (targetId) {
+      game.lastStrike = {
+        strikerId: playerId,
+        targetId,
+        timestamp: currentTime,
+      }
+    }
   }
 }
 
