@@ -26,6 +26,8 @@ const COLLISION_THRESHOLD = PLAYER_RADIUS + OBSTACLE_RADIUS
 const QUEUED_ACTION_DURATION = 250
 
 export const KNOCKBACK_RECOVERY_TIME_MS = 400 // ms
+const STRIKE_RANGE_BEHIND = MAX_SPEED // units to scan behind for targets
+const STRIKE_COOLDOWN_MS = 2000 // 2 second cooldown between strikes
 
 type Persisted = {
   sessionCount: number
@@ -42,11 +44,23 @@ interface Obstacle extends Position2D {
   indestructible: boolean
 }
 
-export enum PlayerAction {
-  NONE = 0,
-  TURN_LEFT,
-  TURN_RIGHT,
-}
+export const PlayerAction = {
+  NONE: { type: "move", direction: 0 },
+  TURN_LEFT: { type: "move", direction: -1 },
+  TURN_RIGHT: { type: "move", direction: 1 },
+} as const
+
+export type PlayerAction =
+  | {
+      type: "move"
+      direction: number
+    }
+  | {
+      type: "boost"
+    }
+  | {
+      type: "strike"
+    }
 
 export enum PlayableCharacter {
   BLUE,
@@ -55,16 +69,15 @@ export enum PlayableCharacter {
   PURPLE,
 }
 
-export interface PlayerState {
+export interface PlayerState extends Position2D {
   character: PlayableCharacter
-  x: number // lane index (0-4)
-  y: number // distance from start
   speed: number
   score: number
-  knockbackEndTime?: number // When knockback effect should end
+  knockbackEndTime: number | undefined
   queuedAction: PlayerAction
-  queueExpireTime: number // When this queued action should be dropped
+  queueExpireTime: number
   boosting: boolean
+  lastStrikeTime?: number // Timestamp of last strike used (for cooldown)
 }
 
 export interface GameState {
@@ -88,6 +101,18 @@ function collidesWithAny(x: number, y: number, objects: Position2D[]): boolean {
   return false
 }
 
+function applyKnockback(target: PlayerState, currentTime: number): void {
+  // Calculate knockback distance based on current speed
+  const knockback = PLAYER_RADIUS + PLAYER_RADIUS * (target.speed / MAX_SPEED)
+  // Reset speed and boost
+  target.speed = 0
+  target.boosting = false
+  // Set or refresh knockback timer
+  target.knockbackEndTime = currentTime + KNOCKBACK_RECOVERY_TIME_MS
+  // Apply knockback distance
+  target.y = target.y - knockback
+}
+
 function enqueueAction(action: PlayerAction, player: PlayerState): void {
   player.queuedAction = action
   player.queueExpireTime = Rune.gameTime() + QUEUED_ACTION_DURATION
@@ -101,6 +126,7 @@ type GameActions = {
   turnRight: () => void
   startBoost: () => void
   stopBoost: () => void
+  strike: () => void
 }
 
 declare global {
@@ -206,12 +232,7 @@ function updatePlayer(
       hasCollision = true
       if (obstacle.indestructible) {
         // Indestructible obstacles cause knockback and stop boosting
-        const knockback =
-          PLAYER_RADIUS + PLAYER_RADIUS * (player.speed / MAX_SPEED)
-        player.speed = 0
-        player.boosting = false // Turn off boosting on hard wall collision
-        player.knockbackEndTime = currentTime + KNOCKBACK_RECOVERY_TIME_MS
-        player.y = player.y - knockback
+        applyKnockback(player, currentTime)
       } else {
         game.obstacles.splice(i, 1)
         if (!player.boosting) {
@@ -364,6 +385,51 @@ function stopBoost(game: GameState, playerId: PlayerId): void {
   player.boosting = false
 }
 
+function strike(game: GameState, playerId: PlayerId): void {
+  const player = game.players[playerId]
+  if (!player) return
+
+  // Cannot strike while in knockback
+  if (player.knockbackEndTime && player.knockbackEndTime > Rune.gameTime()) {
+    return
+  }
+
+  // Check cooldown
+  const currentTime = Rune.gameTime()
+  if (
+    player.lastStrikeTime &&
+    currentTime - player.lastStrikeTime < STRIKE_COOLDOWN_MS
+  ) {
+    return // Still on cooldown
+  }
+
+  // Find the closest target in range
+  let closestTarget: PlayerState | null = null
+  let minDistance = Infinity
+
+  // List all potential targets
+  for (const [targetId, target] of Object.entries(game.players)) {
+    if (targetId === playerId) continue // Skip self
+
+    // Check if target is in range (behind to unlimited forward)
+    const distance = target.y - player.y
+    if (distance < -STRIKE_RANGE_BEHIND) continue
+
+    // Update closest target if this one is closer
+    if (Math.abs(distance) < Math.abs(minDistance)) {
+      closestTarget = target
+      // eslint-disable-next-line rune/no-global-scope-mutation
+      minDistance = distance
+    }
+  }
+
+  // If we found a target, strike them
+  if (closestTarget) {
+    applyKnockback(closestTarget, currentTime)
+    player.lastStrikeTime = currentTime
+  }
+}
+
 Rune.initLogic({
   minPlayers: 2,
   maxPlayers: 4,
@@ -376,5 +442,6 @@ Rune.initLogic({
     turnRight: (_params, { game, playerId }) => turnRight(game, playerId),
     startBoost: (_params, { game, playerId }) => startBoost(game, playerId),
     stopBoost: (_params, { game, playerId }) => stopBoost(game, playerId),
+    strike: (_params, { game, playerId }) => strike(game, playerId),
   },
 })

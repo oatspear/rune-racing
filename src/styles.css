@@ -35,21 +35,26 @@ main {
   width: 100vw;
   display: flex;
   justify-content: center;
-  gap: 2rem;
-  padding: 2rem 1rem env(safe-area-inset-bottom, 2.5rem) 1rem;
+  padding: 1.5rem 1rem env(safe-area-inset-bottom, 2rem) 1rem;
   background: linear-gradient(to top, rgba(0,0,0,0.5), transparent);
   z-index: 10;
   touch-action: manipulation;
 }
 
-button {
-  padding: 1.5rem 3rem;
+.control-buttons {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: nowrap;
+}
+
+.control-button {
+  padding: 1.2rem 2rem;
   background: #4a4a4a;
   border: none;
   border-radius: 12px;
   color: white;
   font-weight: bold;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   cursor: pointer;
   touch-action: manipulation;
   user-select: none;
@@ -57,17 +62,19 @@ button {
   -webkit-tap-highlight-color: transparent;
   transition: transform 0.1s, background-color 0.2s;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  min-width: 120px;
+  flex: 1;
 }
 
-button:active,
-button.active {
+.control-button:active,
+.control-button.active {
   transform: scale(0.95);
   background-color: #3a3a3a;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 @media (hover: hover) {
-  button:hover {
+  .control-button:hover {
     background-color: #5a5a5a;
   }
 }

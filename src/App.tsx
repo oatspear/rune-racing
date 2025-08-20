@@ -138,25 +138,42 @@ const App = () => {
         <ScoreHUD game={game} yourPlayerId={yourPlayerId} />
       </div>
       <div id="controls-hud">
-        <button
-          onPointerDown={() => Rune.actions.startBoost()}
-          onPointerUp={() => Rune.actions.stopBoost()}
-          onPointerLeave={() => Rune.actions.stopBoost()}
-          onTouchStart={(e) => {
-            e.preventDefault() // Prevent double-firing with pointer events
-            Rune.actions.startBoost()
-          }}
-          onTouchEnd={(e) => {
-            e.preventDefault()
-            Rune.actions.stopBoost()
-          }}
-          onTouchCancel={(e) => {
-            e.preventDefault()
-            Rune.actions.stopBoost()
-          }}
-        >
-          Boost
-        </button>
+        <div className="control-buttons">
+          <button
+            className="control-button"
+            onPointerDown={() => Rune.actions.startBoost()}
+            onPointerUp={() => Rune.actions.stopBoost()}
+            onPointerLeave={() => Rune.actions.stopBoost()}
+            onTouchStart={(e) => {
+              e.preventDefault() // Prevent double-firing with pointer events
+              Rune.actions.startBoost()
+            }}
+            onTouchEnd={(e) => {
+              e.preventDefault()
+              Rune.actions.stopBoost()
+            }}
+            onTouchCancel={(e) => {
+              e.preventDefault()
+              Rune.actions.stopBoost()
+            }}
+          >
+            Boost
+          </button>
+          <button
+            className="control-button"
+            onPointerDown={() => {
+              console.log("Strike button pressed")
+              Rune.actions.strike()
+            }}
+            onTouchStart={(e) => {
+              e.preventDefault() // Prevent double-firing with pointer events
+              console.log("Strike button touched")
+              Rune.actions.strike()
+            }}
+          >
+            Strike
+          </button>
+        </div>
       </div>
     </>
   )
