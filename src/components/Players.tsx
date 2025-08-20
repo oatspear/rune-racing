@@ -14,14 +14,23 @@ import {
   PLAYER_RADIUS,
   PlayerState,
 } from "../logic"
-import { Graphics, useApp } from "@pixi/react"
-import { Graphics as PixiGraphics } from "pixi.js"
-import { useRef } from "react"
-import {
-  LANE_MARGIN,
-  PLAYER_COLORS,
-  VISIBLE_TRACK_HEIGHT,
-} from "../client_constants"
+
+// -----------------------------------------------------------------------------
+// Constants
+// -----------------------------------------------------------------------------
+
+const PLAYER_COLORS: Record<string, number> = {
+  "0": 0xff0000, // Red
+  "1": 0x00ff00, // Green
+  "2": 0x0000ff, // Blue
+  "3": 0xffff00, // Yellow
+  "4": 0xff00ff, // Magenta
+}
+import { Graphics, useApp, useTick } from "@pixi/react"
+import { Graphics as PixiGraphics } from "@pixi/graphics"
+import { useRef, useState } from "react"
+import { LANE_MARGIN, VISIBLE_TRACK_HEIGHT } from "../client_constants"
+import StrikeEffect from "./StrikeEffect"
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -55,6 +64,11 @@ const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
   const laneWidth = (width - 2 * LANE_MARGIN) / NUM_LANES
   const centerY = height / 2 // Camera-relative center point
   const trailsRef = useRef<Record<PlayerId, PlayerTrail>>({})
+  const [time, setTime] = useState(0)
+
+  useTick((delta) => {
+    setTime((t) => t + delta * 0.01) // Slow down the animation a bit
+  })
 
   const now = performance.now()
   for (const playerId of Object.values(game.playerIds)) {
@@ -66,30 +80,89 @@ const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
     }
   }
 
+  const renderStrikeEffects = () => {
+    return Object.entries(game.players).map(([playerId, player]) => {
+      // Only show effect if player was hit by a strike (not by obstacle)
+      if (
+        !player.knockbackEndTime ||
+        !game.lastStrike ||
+        game.lastStrike.targetId !== playerId ||
+        // Check if the strike event is recent enough to be relevant to current knockback
+        Math.abs(
+          game.lastStrike.timestamp -
+            (player.knockbackEndTime - KNOCKBACK_RECOVERY_TIME_MS)
+        ) > 100
+      ) {
+        return null
+      }
+
+      const lane = Math.max(0, Math.min(NUM_LANES - 1, player.x))
+      const x = LANE_MARGIN + laneWidth * (lane + 0.5)
+      const relativeY = player.y - cameraY
+      const y = centerY - (relativeY / VISIBLE_TRACK_HEIGHT) * height
+      const playerScreenRadius = (PLAYER_RADIUS / VISIBLE_TRACK_HEIGHT) * height
+
+      if (Math.abs(relativeY) > VISIBLE_TRACK_HEIGHT / 2) return null
+
+      return (
+        <StrikeEffect
+          key={`strike-${playerId}`}
+          x={x}
+          y={y}
+          radius={playerScreenRadius * 2}
+          time={time}
+        />
+      )
+    })
+  }
+
   return (
-    <Graphics
-      key={JSON.stringify(game.players)}
-      draw={(g) => {
-        g.clear()
-        const now = performance.now()
+    <>
+      {/* Draw base players and their trails */}
+      <Graphics
+        key={`players-${JSON.stringify(game.players)}`}
+        draw={(g) => {
+          g.clear()
+          const now = performance.now()
 
-        // Draw other players first
-        for (const [playerId, player] of Object.entries(game.players)) {
-          if (playerId === yourPlayerId) continue // Skip current player
-          const trail = trailsRef.current[playerId]
-          updateTrail(trail, player, now)
-          drawPlayer(g, player, cameraY, height, laneWidth, centerY, trail, now)
-        }
+          // Draw other players first
+          for (const [playerId, player] of Object.entries(game.players)) {
+            if (playerId === yourPlayerId) continue // Skip current player
+            const trail = trailsRef.current[playerId]
+            updateTrail(trail, player, now)
+            drawPlayer(
+              g,
+              player,
+              cameraY,
+              height,
+              laneWidth,
+              centerY,
+              trail,
+              now
+            )
+          }
 
-        // Draw current player last, at dynamic position based on speed
-        if (yourPlayerId && game.players[yourPlayerId]) {
-          const player = game.players[yourPlayerId]
-          const trail = trailsRef.current[yourPlayerId]
-          updateTrail(trail, player, now)
-          drawPlayer(g, player, cameraY, height, laneWidth, centerY, trail, now)
-        }
-      }}
-    />
+          // Draw current player last
+          if (yourPlayerId && game.players[yourPlayerId]) {
+            const player = game.players[yourPlayerId]
+            const trail = trailsRef.current[yourPlayerId]
+            updateTrail(trail, player, now)
+            drawPlayer(
+              g,
+              player,
+              cameraY,
+              height,
+              laneWidth,
+              centerY,
+              trail,
+              now
+            )
+          }
+        }}
+      />
+      {/* Draw strike effects on top */}
+      {renderStrikeEffects()}
+    </>
   )
 }
 
