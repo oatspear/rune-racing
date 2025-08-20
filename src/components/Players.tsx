@@ -100,7 +100,10 @@ const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
 
       // Get striker's character color from their player state, lightened like when boosting
       const striker = game.players[game.lastStrike.strikerId]
-      const baseColor = striker ? PLAYER_COLORS[striker.character] : undefined
+      const baseColor =
+        striker && striker.character != null
+          ? PLAYER_COLORS[striker.character]
+          : undefined
       const strikerColor = baseColor ? lightenColor(baseColor, 0.5) : undefined
 
       return (
@@ -226,7 +229,10 @@ function drawPlayer(
   }
 
   const y = centerY - (relativeY / VISIBLE_TRACK_HEIGHT) * height + speedY
-  let color = PLAYER_COLORS[player.character] || 0x202020
+  let color =
+    player.character != null && PLAYER_COLORS[player.character] != null
+      ? PLAYER_COLORS[player.character]
+      : 0x202020
   if (player.boosting) {
     color = lightenColor(color, 0.5) // Lighten color when boosting
   }

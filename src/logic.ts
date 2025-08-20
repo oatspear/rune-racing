@@ -33,6 +33,11 @@ type Persisted = {
   sessionCount: number
 }
 
+export enum GamePhase {
+  CHARACTER_SELECT,
+  RACING,
+}
+
 export interface Position2D {
   x: number // lane index (0-4)
   y: number // distance from start
@@ -70,7 +75,8 @@ export enum PlayableCharacter {
 }
 
 export interface PlayerState extends Position2D {
-  character: PlayableCharacter
+  character: PlayableCharacter | null
+  ready: boolean
   speed: number
   score: number
   knockbackEndTime: number | undefined
@@ -87,6 +93,7 @@ export interface StrikeEvent {
 }
 
 export interface GameState {
+  phase: GamePhase
   players: Record<PlayerId, PlayerState>
   playerIds: PlayerId[]
   lastUpdateTime: number
@@ -129,6 +136,8 @@ function enqueueAction(action: PlayerAction, player: PlayerState): void {
 // -----------------------------------------------------------------------------
 
 type GameActions = {
+  selectCharacter: (params: { character: PlayableCharacter | null }) => void
+  toggleReady: () => void
   turnLeft: () => void
   turnRight: () => void
   startBoost: () => void
@@ -168,7 +177,8 @@ function setup(allPlayerIds: PlayerId[]): GameState {
   characters.sort(() => Math.random() - 0.5)
   allPlayerIds.forEach((playerId) => {
     players[playerId] = {
-      character: characters.pop()!,
+      character: null,
+      ready: false,
       x: lanes.splice(0, 1)[0], // Start in assigned lane
       y: -MAX_SPEED / 2,
       speed: 0, // Start from rest
@@ -211,6 +221,7 @@ function setup(allPlayerIds: PlayerId[]): GameState {
   }
 
   return {
+    phase: GamePhase.CHARACTER_SELECT,
     players,
     playerIds: allPlayerIds,
     lastUpdateTime: Rune.gameTime(),
@@ -310,24 +321,29 @@ function updateGame(game: GameState): void {
   const deltaTime = (currentTime - game.lastUpdateTime) / 1000 // Convert to seconds
   game.lastUpdateTime = currentTime
 
-  // Update all players' speeds and positions using delta time
-  for (const [playerId, player] of Object.entries(game.players)) {
-    updatePlayer(game, playerId, player, currentTime, deltaTime)
+  // Only update player positions during the racing phase
+  if (game.phase === GamePhase.RACING) {
+    // Update all players' speeds and positions using delta time
+    for (const [playerId, player] of Object.entries(game.players)) {
+      updatePlayer(game, playerId, player, currentTime, deltaTime)
+    }
   }
 
   // TODO remove from the game any pickups or obstacles that are behind all players.
 
-  // Check if any player has finished
-  const winners = Object.entries(game.players)
-    .filter(([, player]) => player.y >= TRACK_LENGTH + MAX_SPEED / 4)
-    .map(([playerId]) => playerId)
+  // Only check for winners during the racing phase
+  if (game.phase === GamePhase.RACING) {
+    const winners = Object.entries(game.players)
+      .filter(([, player]) => player.y >= TRACK_LENGTH + MAX_SPEED / 4)
+      .map(([playerId]) => playerId)
 
-  if (winners.length > 0) {
-    const results: Record<PlayerId, "WON" | "LOST"> = {}
-    game.playerIds.forEach((id) => {
-      results[id] = winners.includes(id) ? "WON" : "LOST"
-    })
-    Rune.gameOver({ players: results })
+    if (winners.length > 0) {
+      const results: Record<PlayerId, "WON" | "LOST"> = {}
+      game.playerIds.forEach((id) => {
+        results[id] = winners.includes(id) ? "WON" : "LOST"
+      })
+      Rune.gameOver({ players: results })
+    }
   }
 }
 
@@ -458,10 +474,69 @@ Rune.initLogic({
   setup,
   update: ({ game }) => updateGame(game),
   actions: {
-    turnLeft: (_params, { game, playerId }) => turnLeft(game, playerId),
-    turnRight: (_params, { game, playerId }) => turnRight(game, playerId),
-    startBoost: (_params, { game, playerId }) => startBoost(game, playerId),
-    stopBoost: (_params, { game, playerId }) => stopBoost(game, playerId),
-    strike: (_params, { game, playerId }) => strike(game, playerId),
+    selectCharacter: ({ character }, { game, playerId }) => {
+      const player = game.players[playerId]
+      if (!player || game.phase !== GamePhase.CHARACTER_SELECT) return
+
+      // If selecting null (deselecting) or a new character
+      if (
+        character === null ||
+        !Object.values(game.players).some(
+          (p: PlayerState) => p.character === character
+        )
+      ) {
+        player.character = character
+        // Unready when changing character
+        player.ready = false
+      }
+    },
+    toggleReady: (_params, { game, playerId }) => {
+      const player = game.players[playerId]
+      if (!player || game.phase !== GamePhase.CHARACTER_SELECT) return
+      if (player.character === null) return // Can't ready up without a character
+
+      player.ready = !player.ready
+
+      // Check if everyone is ready
+      const allReady = Object.values(game.players).every(
+        (p: PlayerState) => p.ready && p.character !== null
+      )
+
+      if (allReady) {
+        game.phase = GamePhase.RACING
+        // Randomly assign lanes like before
+        const lanes = Array.from({ length: game.playerIds.length }, (_, i) => {
+          if (game.playerIds.length >= 4) {
+            return i % 2 === 0 ? 1 : 3
+          } else if (game.playerIds.length === 3) {
+            return i + 1
+          } else {
+            return i === 0 ? 1 : 3
+          }
+        })
+
+        // Update player positions
+        for (const playerId of game.playerIds) {
+          const player = game.players[playerId]
+          player.x = lanes.splice(0, 1)[0]
+          player.y = -MAX_SPEED / 2
+        }
+      }
+    },
+    turnLeft: (_params, { game, playerId }) => {
+      if (game.phase === GamePhase.RACING) turnLeft(game, playerId)
+    },
+    turnRight: (_params, { game, playerId }) => {
+      if (game.phase === GamePhase.RACING) turnRight(game, playerId)
+    },
+    startBoost: (_params, { game, playerId }) => {
+      if (game.phase === GamePhase.RACING) startBoost(game, playerId)
+    },
+    stopBoost: (_params, { game, playerId }) => {
+      if (game.phase === GamePhase.RACING) stopBoost(game, playerId)
+    },
+    strike: (_params, { game, playerId }) => {
+      if (game.phase === GamePhase.RACING) strike(game, playerId)
+    },
   },
 })

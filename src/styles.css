@@ -11,6 +11,115 @@ html {
   overflow: hidden;
 }
 
+.character-select {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  height: 100vh;
+  padding: 1rem;
+  gap: 1rem;
+  box-sizing: border-box;
+}
+
+.character-select h1 {
+  font-size: 1.5rem;
+  text-align: center;
+  margin: 0;
+}
+
+.character-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  width: 100%;
+  max-width: 600px;
+  flex: 1;
+}
+
+.character-button {
+  position: relative;
+  padding: 2rem 1rem;
+  border: none;
+  border-radius: 12px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition: transform 0.2s, filter 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.character-button:not(:disabled):hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+}
+
+.character-button:not(:disabled):active {
+  transform: translateY(0);
+}
+
+.character-button.selected:not(.yours) {
+  filter: grayscale(0.7);
+  cursor: not-allowed;
+}
+
+.character-button.yours {
+  box-shadow: 0 0 0 4px white;
+}
+
+.taken-by {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.ready-section {
+  flex: 0 0 auto;
+  padding: 1rem;
+}
+
+.ready-button {
+  padding: 1rem 3rem;
+  font-size: 1.2rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 12px;
+  background-color: #4a4a4a;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.ready-button:not(:disabled):hover {
+  background-color: #5a5a5a;
+  transform: translateY(-2px);
+}
+
+.ready-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ready-button.ready {
+  background-color: #50c878;
+}
+
+.all-ready-message {
+  color: #50c878;
+  font-weight: bold;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
 main {
   display: flex;
   flex-direction: column;

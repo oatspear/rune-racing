@@ -8,11 +8,12 @@
 import { Stage } from "@pixi/react"
 import { useEffect, useState, useMemo } from "react"
 import { PlayerId } from "rune-sdk"
-import { GameState } from "./logic.ts"
+import { GameState, GamePhase } from "./logic.ts"
 import Players from "./components/Players.tsx"
 import { VISIBLE_TRACK_HEIGHT } from "./client_constants.ts"
 import ScoreHUD from "./components/ScoreHUD.tsx"
 import RaceTrack from "./components/RaceTrack.tsx"
+import CharacterSelect from "./components/CharacterSelect.tsx"
 // import Notifications from "./components/Notifications.tsx"
 
 // -----------------------------------------------------------------------------
@@ -127,59 +128,64 @@ const App = () => {
 
   return (
     <>
-      <div id="board-container">
-        <Stage
-          options={{ backgroundAlpha: 0 }}
-          width={window.innerWidth}
-          height={window.innerHeight}
-        >
-          <RaceTrack game={game} cameraY={cameraY} />
-          <Players game={game} yourPlayerId={yourPlayerId} cameraY={cameraY} />
-        </Stage>
-        <ScoreHUD game={game} yourPlayerId={yourPlayerId} />
+      {game.phase === GamePhase.CHARACTER_SELECT ? (
+        <CharacterSelect game={game} yourPlayerId={yourPlayerId} />
+      ) : (
+        <>
+          <div id="board-container">
+            <Stage
+              options={{ backgroundAlpha: 0 }}
+              width={window.innerWidth}
+              height={window.innerHeight}
+            >
+              <RaceTrack game={game} cameraY={cameraY} />
+              <Players
+                game={game}
+                yourPlayerId={yourPlayerId}
+                cameraY={cameraY}
+              />
+            </Stage>
+            <ScoreHUD game={game} yourPlayerId={yourPlayerId} />
+          </div>
 
-        {/* <Notifications
-          currentTime={Rune.gameTime()}
-          yourPlayerId={yourPlayerId}
-          strikeEvent={game.lastStrike}
-        /> */}
-      </div>
-      <div id="controls-hud">
-        <div className="control-buttons">
-          <button
-            className="control-button"
-            onPointerDown={() => Rune.actions.startBoost()}
-            onPointerUp={() => Rune.actions.stopBoost()}
-            onPointerLeave={() => Rune.actions.stopBoost()}
-            onTouchStart={(e) => {
-              e.preventDefault() // Prevent double-firing with pointer events
-              Rune.actions.startBoost()
-            }}
-            onTouchEnd={(e) => {
-              e.preventDefault()
-              Rune.actions.stopBoost()
-            }}
-            onTouchCancel={(e) => {
-              e.preventDefault()
-              Rune.actions.stopBoost()
-            }}
-          >
-            Boost
-          </button>
-          <button
-            className="control-button"
-            onPointerDown={() => {
-              Rune.actions.strike()
-            }}
-            onTouchStart={(e) => {
-              e.preventDefault() // Prevent double-firing with pointer events
-              Rune.actions.strike()
-            }}
-          >
-            Strike
-          </button>
-        </div>
-      </div>
+          <div id="controls-hud">
+            <div className="control-buttons">
+              <button
+                className="control-button"
+                onPointerDown={() => Rune.actions.startBoost()}
+                onPointerUp={() => Rune.actions.stopBoost()}
+                onPointerLeave={() => Rune.actions.stopBoost()}
+                onTouchStart={(e) => {
+                  e.preventDefault() // Prevent double-firing with pointer events
+                  Rune.actions.startBoost()
+                }}
+                onTouchEnd={(e) => {
+                  e.preventDefault()
+                  Rune.actions.stopBoost()
+                }}
+                onTouchCancel={(e) => {
+                  e.preventDefault()
+                  Rune.actions.stopBoost()
+                }}
+              >
+                Boost
+              </button>
+              <button
+                className="control-button"
+                onPointerDown={() => {
+                  Rune.actions.strike()
+                }}
+                onTouchStart={(e) => {
+                  e.preventDefault() // Prevent double-firing with pointer events
+                  Rune.actions.strike()
+                }}
+              >
+                Strike
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </>
   )
 }
