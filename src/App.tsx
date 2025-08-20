@@ -138,11 +138,25 @@ const App = () => {
         <ScoreHUD game={game} yourPlayerId={yourPlayerId} />
       </div>
       <div id="controls-hud">
-        <button onPointerDown={() => Rune.actions.turnLeft()}>Turn Left</button>
-        <button onPointerDown={() => Rune.actions.turnRight()}>
-          Turn Right
+        <button
+          onPointerDown={() => Rune.actions.startBoost()}
+          onPointerUp={() => Rune.actions.stopBoost()}
+          onPointerLeave={() => Rune.actions.stopBoost()}
+          onTouchStart={(e) => {
+            e.preventDefault() // Prevent double-firing with pointer events
+            Rune.actions.startBoost()
+          }}
+          onTouchEnd={(e) => {
+            e.preventDefault()
+            Rune.actions.stopBoost()
+          }}
+          onTouchCancel={(e) => {
+            e.preventDefault()
+            Rune.actions.stopBoost()
+          }}
+        >
+          Boost
         </button>
-        <button onPointerDown={() => Rune.actions.boostSpeed()}>Boost</button>
       </div>
     </>
   )

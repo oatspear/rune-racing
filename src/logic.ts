@@ -99,7 +99,8 @@ function enqueueAction(action: PlayerAction, player: PlayerState): void {
 type GameActions = {
   turnLeft: () => void
   turnRight: () => void
-  boostSpeed: () => void
+  startBoost: () => void
+  stopBoost: () => void
 }
 
 declare global {
@@ -204,10 +205,11 @@ function updatePlayer(
     ) {
       hasCollision = true
       if (obstacle.indestructible) {
-        // Indestructible obstacles cause knockback
+        // Indestructible obstacles cause knockback and stop boosting
         const knockback =
           PLAYER_RADIUS + PLAYER_RADIUS * (player.speed / MAX_SPEED)
         player.speed = 0
+        player.boosting = false // Turn off boosting on hard wall collision
         player.knockbackEndTime = currentTime + KNOCKBACK_RECOVERY_TIME_MS
         player.y = player.y - knockback
       } else {
@@ -238,10 +240,13 @@ function updatePlayer(
     if (player.knockbackEndTime && player.knockbackEndTime > currentTime) {
       // During knockback, player stays at knocked back position with zero speed
       player.speed = 0
+      // Ensure boosting stays off during knockback
+      player.boosting = false
     } else if (player.knockbackEndTime) {
       // Knockback just ended, resume from knocked back position
       player.knockbackEndTime = undefined
       player.speed = 0
+      // Keep boosting off; player must release and press boost again
     } else {
       // Try queued actions first if they exist
       if (player.queuedAction) {
@@ -286,7 +291,7 @@ function updateGame(game: GameState): void {
 
   // Check if any player has finished
   const winners = Object.entries(game.players)
-    .filter(([, player]) => player.y >= TRACK_LENGTH + MAX_SPEED / 2)
+    .filter(([, player]) => player.y >= TRACK_LENGTH + MAX_SPEED / 4)
     .map(([playerId]) => playerId)
 
   if (winners.length > 0) {
@@ -344,11 +349,19 @@ function turnRight(game: GameState, playerId: PlayerId): void {
   }
 }
 
-function boostSpeed(game: GameState, playerId: PlayerId): void {
+function startBoost(game: GameState, playerId: PlayerId): void {
   const player = game.players[playerId]
   if (!player) return
+  // Only allow boosting if not in knockback
+  if (!player.knockbackEndTime) {
+    player.boosting = true
+  }
+}
 
-  player.boosting = !player.boosting // Toggle boosting state
+function stopBoost(game: GameState, playerId: PlayerId): void {
+  const player = game.players[playerId]
+  if (!player) return
+  player.boosting = false
 }
 
 Rune.initLogic({
@@ -361,6 +374,7 @@ Rune.initLogic({
   actions: {
     turnLeft: (_params, { game, playerId }) => turnLeft(game, playerId),
     turnRight: (_params, { game, playerId }) => turnRight(game, playerId),
-    boostSpeed: (_params, { game, playerId }) => boostSpeed(game, playerId),
+    startBoost: (_params, { game, playerId }) => startBoost(game, playerId),
+    stopBoost: (_params, { game, playerId }) => stopBoost(game, playerId),
   },
 })

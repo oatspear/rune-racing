@@ -35,28 +35,39 @@ main {
   width: 100vw;
   display: flex;
   justify-content: center;
-  gap: 1.5rem;
-  padding: 1.5rem 0 2.5rem 0;
-  background: transparent;
+  gap: 2rem;
+  padding: 2rem 1rem env(safe-area-inset-bottom, 2.5rem) 1rem;
+  background: linear-gradient(to top, rgba(0,0,0,0.5), transparent);
   z-index: 10;
+  touch-action: manipulation;
 }
 
 button {
-  padding: 1rem 2rem;
+  padding: 1.5rem 3rem;
   background: #4a4a4a;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   color: white;
   font-weight: bold;
   font-size: 1.2rem;
   cursor: pointer;
-  transition: background-color 0.2s;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.1s, background-color 0.2s;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-button:hover {
-  background: #5a5a5a;
+button:active,
+button.active {
+  transform: scale(0.95);
+  background-color: #3a3a3a;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-button:active {
-  background: #3a3a3a;
+@media (hover: hover) {
+  button:hover {
+    background-color: #5a5a5a;
+  }
 }
