@@ -10,9 +10,16 @@ interface StrikeEffectProps {
   y: number
   radius: number // Base radius of the effect
   time: number // Current time for animation
+  color?: number // Color in hex format (0xRRGGBB)
 }
 
-const StrikeEffect = ({ x, y, radius, time }: StrikeEffectProps) => {
+const StrikeEffect = ({
+  x,
+  y,
+  radius,
+  time,
+  color = 0xffffff,
+}: StrikeEffectProps) => {
   // Memoize our draw function to avoid recreating it every frame
   const draw = useMemo(() => {
     return (g: PixiGraphics) => {
@@ -29,7 +36,7 @@ const StrikeEffect = ({ x, y, radius, time }: StrikeEffectProps) => {
         const armRotation = (arm * Math.PI * 2) / arms + time * 5 // Faster rotation
 
         // Start with no alpha
-        g.lineStyle(3, 0xffffff, 0)
+        g.lineStyle(3, color, 0)
         g.moveTo(x, y)
 
         // Draw each segment of the spiral
@@ -52,7 +59,7 @@ const StrikeEffect = ({ x, y, radius, time }: StrikeEffectProps) => {
           const alpha = Math.pow(Math.sin(t * Math.PI), 1.5) // Sharper fade
           // Thicker lines at the peaks
           const lineWidth = 2 + Math.sin(t * Math.PI * 6) * 2
-          g.lineStyle(lineWidth, 0xffffff, alpha * 0.7)
+          g.lineStyle(lineWidth, color, alpha * 0.7)
           g.lineTo(px, py)
         }
       }
@@ -72,14 +79,14 @@ const StrikeEffect = ({ x, y, radius, time }: StrikeEffectProps) => {
         // Sharper fade out
         const alpha = Math.pow(1 - particleTime, 1.5) * 0.8
         g.lineStyle(0)
-        g.beginFill(0xffffff, alpha)
+        g.beginFill(color, alpha)
         // Smaller, more consistent particles
         const size = 1.2 + Math.sin(time * 6 + i) * 0.4
         g.drawCircle(px, py, size)
         g.endFill()
       }
     }
-  }, [x, y, radius, time])
+  }, [x, y, radius, time, color])
 
   return <Graphics draw={draw} />
 }

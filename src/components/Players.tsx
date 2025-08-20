@@ -19,14 +19,8 @@ import {
 // Constants
 // -----------------------------------------------------------------------------
 
-const PLAYER_COLORS: Record<string, number> = {
-  "0": 0xff0000, // Red
-  "1": 0x00ff00, // Green
-  "2": 0x0000ff, // Blue
-  "3": 0xffff00, // Yellow
-  "4": 0xff00ff, // Magenta
-}
 import { Graphics, useApp, useTick } from "@pixi/react"
+import { PLAYER_COLORS, lightenColor } from "../client_constants"
 import { Graphics as PixiGraphics } from "@pixi/graphics"
 import { useRef, useState } from "react"
 import { LANE_MARGIN, VISIBLE_TRACK_HEIGHT } from "../client_constants"
@@ -104,6 +98,11 @@ const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
 
       if (Math.abs(relativeY) > VISIBLE_TRACK_HEIGHT / 2) return null
 
+      // Get striker's character color from their player state, lightened like when boosting
+      const striker = game.players[game.lastStrike.strikerId]
+      const baseColor = striker ? PLAYER_COLORS[striker.character] : undefined
+      const strikerColor = baseColor ? lightenColor(baseColor, 0.5) : undefined
+
       return (
         <StrikeEffect
           key={`strike-${playerId}`}
@@ -111,6 +110,7 @@ const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
           y={y}
           radius={playerScreenRadius * 2}
           time={time}
+          color={strikerColor}
         />
       )
     })
@@ -291,16 +291,4 @@ function drawPlayer(
     y + playerScreenRadius,
   ])
   g.endFill()
-}
-
-function lightenColor(color: number, factor: number): number {
-  const r = (color >> 16) & 0xff
-  const g = (color >> 8) & 0xff
-  const b = color & 0xff
-
-  const newR = Math.min(255, r + (255 - r) * factor)
-  const newG = Math.min(255, g + (255 - g) * factor)
-  const newB = Math.min(255, b + (255 - b) * factor)
-
-  return (newR << 16) | (newG << 8) | newB
 }

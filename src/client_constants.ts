@@ -28,3 +28,19 @@ export const PLAYER_OUTLINE_COLORS = {
   [PlayableCharacter.GREEN]: 0xfafafa, // Almost White
   [PlayableCharacter.PURPLE]: 0xff00ff, // Neon Pink
 }
+
+/**
+ * Lightens a color by a specified factor (between 0 and 1).
+ * Used for both boosting players and strike effects.
+ */
+export function lightenColor(color: number, factor: number): number {
+  const r = (color >> 16) & 0xff
+  const g = (color >> 8) & 0xff
+  const b = color & 0xff
+
+  const newR = Math.min(255, r + (255 - r) * factor)
+  const newG = Math.min(255, g + (255 - g) * factor)
+  const newB = Math.min(255, b + (255 - b) * factor)
+
+  return (newR << 16) | (newG << 8) | newB
+}
