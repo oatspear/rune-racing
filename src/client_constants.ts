@@ -11,8 +11,8 @@ import { PlayableCharacter } from "./logic"
 // Constants
 // -----------------------------------------------------------------------------
 
-export const LANE_MARGIN = 30
-export const VISIBLE_TRACK_HEIGHT = 240 // How much of track to show ahead/behind in game units
+export const LANE_MARGIN = 40 // Side margin for the track
+export const VISIBLE_TRACK_HEIGHT = 360 // How much of track to show ahead/behind in game units
 export const TRACK_LENGTH = 2400
 
 export const PLAYER_COLORS = {

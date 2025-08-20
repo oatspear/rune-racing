@@ -37,11 +37,11 @@ const App = () => {
     if (!game || !yourPlayerId || !game.players[yourPlayerId]) return 0
 
     const player = game.players[yourPlayerId]
-    // We want the player at 4/6 down the screen
+    // We want the player at 5/6 down the screen
     // Camera is at the center, so we need to offset from player position by how far up from center the player should be
-    // 4/6 of screen height = 1/6 down from center
+    // 5/6 of screen height = 1/3 down from center
     // Since the RaceTrack inverts Y coordinates, we need to ADD to move the player down
-    return player.y + VISIBLE_TRACK_HEIGHT / 12 // Move camera down from player position
+    return player.y + VISIBLE_TRACK_HEIGHT / 6 // Move camera down from player position
   }, [game, yourPlayerId])
 
   useEffect(() => {
@@ -68,7 +68,7 @@ const App = () => {
     function onTouchEnd() {
       if (!touchActive) return
       const dx = touchEndX - touchStartX
-      if (Math.abs(dx) > 40) {
+      if (Math.abs(dx) > 24) {
         if (dx < 0) {
           Rune.actions.turnLeft()
         } else {
@@ -93,7 +93,7 @@ const App = () => {
     function onMouseUp() {
       if (!mouseActive) return
       const dx = mouseEndX - mouseStartX
-      if (Math.abs(dx) > 40) {
+      if (Math.abs(dx) > 16) {
         if (dx < 0) {
           Rune.actions.turnLeft()
         } else {

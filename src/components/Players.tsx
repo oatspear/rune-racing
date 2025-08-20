@@ -264,7 +264,7 @@ function drawPlayer(
         trailAlpha *= alpha
       }
 
-      let trailWidth = Math.max(3, 20 * (1 - i / points.length))
+      let trailWidth = Math.max(2, 16 * (1 - i / points.length))
       if (player.boosting) {
         trailWidth *= 1.25
       }
@@ -275,10 +275,8 @@ function drawPlayer(
     }
   }
 
-  // Draw player with blink effect during knockback
-  const playerScreenRadius = (PLAYER_RADIUS / VISIBLE_TRACK_HEIGHT) * height
-
   // Draw player
+  const playerScreenRadius = (PLAYER_RADIUS / VISIBLE_TRACK_HEIGHT) * height
   const outlineColor = 0x2c2c2c // Default outline color
   g.lineStyle(3, outlineColor, alpha)
   g.beginFill(color, alpha)
