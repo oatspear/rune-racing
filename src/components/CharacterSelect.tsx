@@ -4,17 +4,21 @@
 import { PlayableCharacter, GameState } from "../logic"
 import { PLAYER_COLORS } from "../client_constants"
 import { PlayerId } from "rune-sdk"
+import blueImg from "../assets/blue.png"
+import redImg from "../assets/red.png"
+import greenImg from "../assets/green.png"
+import purpleImg from "../assets/purple.png"
 
 interface CharacterSelectProps {
   game: GameState
   yourPlayerId?: PlayerId
 }
 
-const CharacterNames = {
-  [PlayableCharacter.BLUE]: "Sapphire",
-  [PlayableCharacter.RED]: "Ruby",
-  [PlayableCharacter.GREEN]: "Emerald",
-  [PlayableCharacter.PURPLE]: "Amethyst",
+const CharacterImages = {
+  [PlayableCharacter.BLUE]: blueImg,
+  [PlayableCharacter.RED]: redImg,
+  [PlayableCharacter.GREEN]: greenImg,
+  [PlayableCharacter.PURPLE]: purpleImg,
 }
 
 const CharacterSelect = ({ game, yourPlayerId }: CharacterSelectProps) => {
@@ -71,9 +75,11 @@ const CharacterSelect = ({ game, yourPlayerId }: CharacterSelectProps) => {
                     .padStart(6, "0")}`,
                 }}
               >
-                <span className="character-name">
-                  {CharacterNames[character]}
-                </span>
+                <img
+                  src={CharacterImages[character]}
+                  alt=""
+                  className="character-image"
+                />
                 {isSelected && !isYourCharacter && (
                   <span className="taken-by">{selectedPlayerName}</span>
                 )}
