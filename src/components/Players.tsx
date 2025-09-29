@@ -19,10 +19,10 @@ import {
 // Constants
 // -----------------------------------------------------------------------------
 
-import { Graphics, useApp, useTick } from "@pixi/react"
+import { Graphics, useApp } from "@pixi/react"
 import { PLAYER_COLORS, lightenColor } from "../client_constants"
 import { Graphics as PixiGraphics } from "@pixi/graphics"
-import { useRef, useState } from "react"
+import { useRef } from "react"
 import { LANE_MARGIN, VISIBLE_TRACK_HEIGHT } from "../client_constants"
 import StrikeEffect from "./StrikeEffect"
 
@@ -58,11 +58,7 @@ const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
   const laneWidth = (width - 2 * LANE_MARGIN) / NUM_LANES
   const centerY = height / 2 // Camera-relative center point
   const trailsRef = useRef<Record<PlayerId, PlayerTrail>>({})
-  const [time, setTime] = useState(0)
-
-  useTick((delta) => {
-    setTime((t) => t + delta * 0.01) // Slow down the animation a bit
-  })
+  const strikeStartTimes = useRef<Record<string, number>>({}) // Track when each strike effect started
 
   const now = performance.now()
   for (const playerId of Object.values(game.playerIds)) {
@@ -76,16 +72,11 @@ const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
 
   const renderStrikeEffects = () => {
     return Object.entries(game.players).map(([playerId, player]) => {
-      // Only show effect if player was hit by a strike (not by obstacle)
+      // Only show effect if there's an active strike event
       if (
         !player.knockbackEndTime ||
         !game.lastStrike ||
-        game.lastStrike.targetId !== playerId ||
-        // Check if the strike event is recent enough to be relevant to current knockback
-        Math.abs(
-          game.lastStrike.timestamp -
-            (player.knockbackEndTime - KNOCKBACK_RECOVERY_TIME_MS)
-        ) > 100
+        game.lastStrike.targetId !== playerId
       ) {
         return null
       }
@@ -100,11 +91,26 @@ const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
 
       // Get striker's character color from their player state, lightened like when boosting
       const striker = game.players[game.lastStrike.strikerId]
-      const baseColor =
-        striker && striker.character != null
-          ? PLAYER_COLORS[striker.character]
-          : undefined
-      const strikerColor = baseColor ? lightenColor(baseColor, 0.5) : undefined
+      // const baseColor =
+      //   striker && striker.character != null
+      //     ? PLAYER_COLORS[striker.character]
+      //     : undefined
+      // const strikerColor = baseColor ? lightenColor(baseColor, 0.5) : undefined
+
+      // Create a unique ID for this strike event
+      const strikeId = `${playerId}-${game.lastStrike.timestamp}`
+
+      // Start tracking this strike effect if we haven't seen it before
+      if (!strikeStartTimes.current[strikeId]) {
+        strikeStartTimes.current[strikeId] = now
+      }
+
+      // Calculate animation progress
+      const timeSinceStart = now - strikeStartTimes.current[strikeId]
+      const normalizedTime = Math.min(
+        timeSinceStart / (KNOCKBACK_RECOVERY_TIME_MS + 100),
+        1
+      )
 
       return (
         <StrikeEffect
@@ -112,8 +118,8 @@ const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
           x={x}
           y={y}
           radius={playerScreenRadius * 2}
-          time={time}
-          color={strikerColor}
+          time={normalizedTime}
+          character={striker?.character ?? undefined}
         />
       )
     })

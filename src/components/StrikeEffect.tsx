@@ -1,94 +1,78 @@
 // SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2025 André "Oats" Santos
 
-import { Graphics } from "@pixi/react"
-import { Graphics as PixiGraphics } from "pixi.js"
+import { Sprite } from "@pixi/react"
+import { BaseTexture, Rectangle, Texture, SCALE_MODES } from "pixi.js"
 import { useMemo } from "react"
+import strikeEffectImage from "../assets/strike-effect.png"
+import { PlayableCharacter } from "../logic"
 
 interface StrikeEffectProps {
   x: number
   y: number
-  radius: number // Base radius of the effect
-  time: number // Current time for animation
-  color?: number // Color in hex format (0xRRGGBB)
+  radius: number // Used for scaling
+  time: number // Used for frame calculation
+  character?: PlayableCharacter // Character type determines effect row
 }
 
-const StrikeEffect = ({
-  x,
-  y,
-  radius,
-  time,
-  color = 0xffffff,
-}: StrikeEffectProps) => {
-  // Memoize our draw function to avoid recreating it every frame
-  const draw = useMemo(() => {
-    return (g: PixiGraphics) => {
-      g.clear()
+const SPRITE_SIZE = 64 // Size of each sprite in the sheet
+const FRAME_COUNT = 13 // Number of frames in the animation
+const EFFECT_ROWS = {
+  [PlayableCharacter.BLUE]: 2, // row 2 for blue
+  [PlayableCharacter.RED]: 7, // row 7 for red
+  [PlayableCharacter.GREEN]: 3, // row 3 for green
+  [PlayableCharacter.PURPLE]: 1, // row 1 for purple
+} as const
 
-      // Number of radial arms
-      const arms = 6
-      // Number of segments per arm
-      const segments = 12
+const StrikeEffect = ({ x, y, radius, time, character }: StrikeEffectProps) => {
+  // Create and cache textures from spritesheet
+  const textures = useMemo(() => {
+    const baseTexture = BaseTexture.from(strikeEffectImage)
+    baseTexture.scaleMode = SCALE_MODES.LINEAR
 
-      // For each radial arm
-      for (let arm = 0; arm < arms; arm++) {
-        // Base rotation for this arm
-        const armRotation = (arm * Math.PI * 2) / arms + time * 5 // Faster rotation
-
-        // Start with no alpha
-        g.lineStyle(3, color, 0)
-        g.moveTo(x, y)
-
-        // Draw each segment of the spiral
-        for (let i = 0; i <= segments; i++) {
-          const t = i / segments
-          // Add spiky variation to radius
-          const radiusVariation = Math.sin(t * Math.PI * 6) * 0.4 + 1
-          const r = radius * t * radiusVariation
-          // Minimal spiral, mostly radial with some wobble
-          const rotation =
-            armRotation +
-            t * Math.PI * 0.5 + // Very slight curve (reduced from 6 to 0.5)
-            Math.sin(time * 8 + t * Math.PI * 3) * 0.3 // Subtle wobble
-
-          // Calculate position
-          const px = x + Math.cos(rotation) * r
-          const py = y + Math.sin(rotation) * r
-
-          // Fade in in the middle, fade out at the ends with sharper falloff
-          const alpha = Math.pow(Math.sin(t * Math.PI), 1.5) // Sharper fade
-          // Thicker lines at the peaks
-          const lineWidth = 2 + Math.sin(t * Math.PI * 6) * 2
-          g.lineStyle(lineWidth, color, alpha * 0.7)
-          g.lineTo(px, py)
-        }
-      }
-
-      // Add particles that follow the arms
-      const particles = 18
-      for (let i = 0; i < particles; i++) {
-        const particleTime = (time * 5 + i / particles) % 1
-        const r = radius * particleTime * (0.9 + Math.sin(time * 6 + i) * 0.15)
-        // Align particles more with the arms
-        const baseRotation = (Math.floor(i / 3) * (Math.PI * 2)) / 6
-        const rotation = baseRotation + time * 5 + Math.sin(time * 4) * 0.2
-
-        const px = x + Math.cos(rotation) * r
-        const py = y + Math.sin(rotation) * r
-
-        // Sharper fade out
-        const alpha = Math.pow(1 - particleTime, 1.5) * 0.8
-        g.lineStyle(0)
-        g.beginFill(color, alpha)
-        // Smaller, more consistent particles
-        const size = 1.2 + Math.sin(time * 6 + i) * 0.4
-        g.drawCircle(px, py, size)
-        g.endFill()
-      }
+    const row = character !== undefined ? EFFECT_ROWS[character] : 0
+    const frames: Texture[] = []
+    for (let i = 0; i < FRAME_COUNT; i++) {
+      frames.push(
+        new Texture(
+          baseTexture,
+          new Rectangle(
+            i * SPRITE_SIZE,
+            row * SPRITE_SIZE,
+            SPRITE_SIZE,
+            SPRITE_SIZE
+          )
+        )
+      )
     }
-  }, [x, y, radius, time, color])
 
-  return <Graphics draw={draw} />
+    // Load the texture if not already loaded
+    if (!baseTexture.valid) {
+      baseTexture.once("loaded", () => {
+        // Force a re-render when texture loads
+        frames.forEach((texture) => texture.update())
+      })
+    }
+
+    return frames
+  }, [character]) // Recreate textures when character changes
+  const frame = Math.floor(time * FRAME_COUNT)
+  const frameIndex = Math.min(frame, FRAME_COUNT - 1) // Don't loop, stay on last frame
+
+  // Calculate sprite properties
+  const scale = (radius * 2) / SPRITE_SIZE // Scale to match the desired radius
+  const anchorX = 0.5
+  const anchorY = 0.5
+
+  return (
+    <Sprite
+      texture={textures[frameIndex]}
+      x={x}
+      y={y}
+      anchor={{ x: anchorX, y: anchorY }}
+      scale={{ x: scale, y: scale }}
+    />
+  )
 }
 
 export default StrikeEffect
