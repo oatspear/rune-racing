@@ -222,12 +222,59 @@ function updateTrail(trail: PlayerTrail, player: PlayerState, now: number) {
       timestamp: now,
     })
     trail.lastUpdate = now
-    if (trail.points.length > 12) {
+    if (trail.points.length > 15) {
+      // Increased from 12 for smoother curves
       trail.points.pop()
     }
   } else if (player.knockbackEndTime) {
     trail.points.length = 0
   }
+}
+
+// Helper function to create smooth curves using Catmull-Rom interpolation
+function getCurvePoints(
+  points: { x: number; y: number }[]
+): { x: number; y: number }[] {
+  if (points.length < 2) return points
+
+  const curvePoints: { x: number; y: number }[] = []
+  const segmentsPerCurve = 8 // Number of interpolated points between each pair
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)]
+    const p1 = points[i]
+    const p2 = points[i + 1]
+    const p3 = points[Math.min(points.length - 1, i + 2)]
+
+    for (let t = 0; t < segmentsPerCurve; t++) {
+      const tNorm = t / segmentsPerCurve
+      const tSq = tNorm * tNorm
+      const tCube = tSq * tNorm
+
+      const x =
+        0.5 *
+        (2 * p1.x +
+          (-p0.x + p2.x) * tNorm +
+          (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * tSq +
+          (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * tCube)
+
+      const y =
+        0.5 *
+        (2 * p1.y +
+          (-p0.y + p2.y) * tNorm +
+          (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * tSq +
+          (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * tCube)
+
+      curvePoints.push({ x, y })
+    }
+  }
+
+  // Add the last point
+  if (points.length > 0) {
+    curvePoints.push(points[points.length - 1])
+  }
+
+  return curvePoints
 }
 
 function drawTrail(
@@ -240,22 +287,15 @@ function drawTrail(
   trail: PlayerTrail,
   now: number
 ) {
-  if (trail.points.length < 2 || player.knockbackEndTime) {
-    return
-  }
-
   const relativeY = player.y - cameraY
   if (Math.abs(relativeY) > VISIBLE_TRACK_HEIGHT / 2) {
     return
   }
 
   let speedY = 0
-  let alpha = 1
 
   if (player.knockbackEndTime) {
-    const knockbackProgress =
-      (player.knockbackEndTime - now) / KNOCKBACK_RECOVERY_TIME_MS
-    alpha = Math.cos(knockbackProgress * Math.PI * 4) * 0.5 + 0.5
+    return // Don't draw trail during knockback
   } else {
     speedY = player.boosting ? 40 : (player.speed / MAX_SPEED) * 40
   }
@@ -268,116 +308,75 @@ function drawTrail(
     color = lightenColor(color, 0.5)
   }
 
-  const points = trail.points
-  let p1 = { lane: player.x, worldY: player.y, timestamp: 0 }
+  // Build array of screen positions including current player position
+  const screenPoints: { x: number; y: number; age: number }[] = []
 
-  // Draw trail with gradient effect (multiple passes for glow)
-  // Pass 1: Outer glow (widest, most transparent)
-  for (let i = 0; i < points.length; i++) {
-    const p2 = points[i]
+  // Add current player position as the first point (age 0)
+  const currentX = LANE_MARGIN + laneWidth * (player.x + 0.5)
+  const currentRelY = player.y - cameraY
+  const currentY =
+    centerY - (currentRelY / VISIBLE_TRACK_HEIGHT) * height + speedY
+  screenPoints.push({ x: currentX, y: currentY, age: 0 })
 
-    const x1 = LANE_MARGIN + laneWidth * (p1.lane + 0.5)
-    const x2 = LANE_MARGIN + laneWidth * (p2.lane + 0.5)
-
-    const relY1 = p1.worldY - cameraY
-    const relY2 = p2.worldY - cameraY
-
-    const screenY1 = centerY - (relY1 / VISIBLE_TRACK_HEIGHT) * height + speedY
-    const screenY2 = centerY - (relY2 / VISIBLE_TRACK_HEIGHT) * height + speedY
-
-    const age = (now - p1.timestamp) / 1000
-    let baseAlpha = Math.max(0, 1 - age)
-    if (!player.boosting) {
-      baseAlpha *= 0.6
-    }
-    if (player.knockbackEndTime) {
-      baseAlpha *= alpha
-    }
-
-    let baseWidth = Math.max(2, 16 * (1 - i / points.length))
-    if (player.boosting) {
-      baseWidth *= 1.25
-    }
-
-    // Outer glow layer
-    g.lineStyle(baseWidth * 1.8, color, baseAlpha * 0.2)
-    g.moveTo(x1, screenY1)
-    g.lineTo(x2, screenY2)
-
-    p1 = p2
+  // Add trail points
+  for (let i = 0; i < trail.points.length; i++) {
+    const point = trail.points[i]
+    const x = LANE_MARGIN + laneWidth * (point.lane + 0.5)
+    const relY = point.worldY - cameraY
+    const y = centerY - (relY / VISIBLE_TRACK_HEIGHT) * height + speedY
+    const age = (now - point.timestamp) / 1000
+    screenPoints.push({ x, y, age })
   }
 
-  // Pass 2: Middle layer
-  p1 = { lane: player.x, worldY: player.y, timestamp: 0 }
-  for (let i = 0; i < points.length; i++) {
-    const p2 = points[i]
+  if (screenPoints.length < 2) return
 
-    const x1 = LANE_MARGIN + laneWidth * (p1.lane + 0.5)
-    const x2 = LANE_MARGIN + laneWidth * (p2.lane + 0.5)
+  // Apply curve smoothing
+  const smoothPoints = getCurvePoints(screenPoints)
 
-    const relY1 = p1.worldY - cameraY
-    const relY2 = p2.worldY - cameraY
-
-    const screenY1 = centerY - (relY1 / VISIBLE_TRACK_HEIGHT) * height + speedY
-    const screenY2 = centerY - (relY2 / VISIBLE_TRACK_HEIGHT) * height + speedY
-
-    const age = (now - p1.timestamp) / 1000
-    let baseAlpha = Math.max(0, 1 - age)
-    if (!player.boosting) {
-      baseAlpha *= 0.6
-    }
-    if (player.knockbackEndTime) {
-      baseAlpha *= alpha
-    }
-
-    let baseWidth = Math.max(2, 16 * (1 - i / points.length))
-    if (player.boosting) {
-      baseWidth *= 1.25
-    }
-
-    // Middle layer
-    g.lineStyle(baseWidth * 1.0, color, baseAlpha * 0.5)
-    g.moveTo(x1, screenY1)
-    g.lineTo(x2, screenY2)
-
-    p1 = p2
+  // Calculate base parameters
+  const totalPoints = smoothPoints.length
+  let baseAlpha = 1.0
+  if (!player.boosting) {
+    baseAlpha *= 0.6
   }
 
-  // Pass 3: Bright core (narrowest, most opaque)
-  p1 = { lane: player.x, worldY: player.y, timestamp: 0 }
-  for (let i = 0; i < points.length; i++) {
-    const p2 = points[i]
+  // Draw three passes for gradient effect
+  const passes = [
+    { widthMult: 1.8, alphaMult: 0.2 }, // Outer glow
+    { widthMult: 1.0, alphaMult: 0.5 }, // Middle layer
+    { widthMult: 0.4, alphaMult: 0.9, useCore: true }, // Bright core
+  ]
 
-    const x1 = LANE_MARGIN + laneWidth * (p1.lane + 0.5)
-    const x2 = LANE_MARGIN + laneWidth * (p2.lane + 0.5)
+  for (const pass of passes) {
+    for (let i = 0; i < smoothPoints.length - 1; i++) {
+      const p1 = smoothPoints[i]
+      const p2 = smoothPoints[i + 1]
 
-    const relY1 = p1.worldY - cameraY
-    const relY2 = p2.worldY - cameraY
+      // Calculate fade based on original trail point indices
+      const originalIndex = Math.floor((i / totalPoints) * trail.points.length)
+      const ageFactor = Math.max(
+        0,
+        1 -
+          screenPoints[Math.min(originalIndex + 1, screenPoints.length - 1)].age
+      )
 
-    const screenY1 = centerY - (relY1 / VISIBLE_TRACK_HEIGHT) * height + speedY
-    const screenY2 = centerY - (relY2 / VISIBLE_TRACK_HEIGHT) * height + speedY
+      const segmentAlpha = baseAlpha * ageFactor * pass.alphaMult
 
-    const age = (now - p1.timestamp) / 1000
-    let baseAlpha = Math.max(0, 1 - age)
-    if (!player.boosting) {
-      baseAlpha *= 0.6
+      // Width tapers along the trail
+      const widthFactor = 1 - i / totalPoints
+      let segmentWidth = Math.max(2, 16 * widthFactor)
+      if (player.boosting) {
+        segmentWidth *= 1.25
+      }
+      segmentWidth *= pass.widthMult
+
+      // Use lightened color for the bright core
+      const drawColor = pass.useCore ? lightenColor(color, 0.3) : color
+
+      g.lineStyle(segmentWidth, drawColor, segmentAlpha)
+      g.moveTo(p1.x, p1.y)
+      g.lineTo(p2.x, p2.y)
     }
-    if (player.knockbackEndTime) {
-      baseAlpha *= alpha
-    }
-
-    let baseWidth = Math.max(2, 16 * (1 - i / points.length))
-    if (player.boosting) {
-      baseWidth *= 1.25
-    }
-
-    // Bright core - use lightened color for extra pop
-    const coreColor = lightenColor(color, 0.3)
-    g.lineStyle(baseWidth * 0.4, coreColor, baseAlpha * 0.9)
-    g.moveTo(x1, screenY1)
-    g.lineTo(x2, screenY2)
-
-    p1 = p2
   }
 }
 
