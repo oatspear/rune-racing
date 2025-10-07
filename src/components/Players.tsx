@@ -41,6 +41,8 @@ const CHARACTER_SPRITES: Record<PlayableCharacter, string> = {
   [PlayableCharacter.PURPLE]: spritePurple,
 }
 
+const DEFAULT_SPRITE = CHARACTER_SPRITES[PlayableCharacter.BLUE]
+
 type PlayersProps = {
   game: GameState
   yourPlayerId?: PlayerId
@@ -266,10 +268,11 @@ function drawTrail(
     color = lightenColor(color, 0.5)
   }
 
-  g.lineStyle(0)
   const points = trail.points
   let p1 = { lane: player.x, worldY: player.y, timestamp: 0 }
 
+  // Draw trail with gradient effect (multiple passes for glow)
+  // Pass 1: Outer glow (widest, most transparent)
   for (let i = 0; i < points.length; i++) {
     const p2 = points[i]
 
@@ -283,21 +286,97 @@ function drawTrail(
     const screenY2 = centerY - (relY2 / VISIBLE_TRACK_HEIGHT) * height + speedY
 
     const age = (now - p1.timestamp) / 1000
-    let trailAlpha = Math.max(0, 1 - age)
+    let baseAlpha = Math.max(0, 1 - age)
     if (!player.boosting) {
-      trailAlpha *= 0.6
+      baseAlpha *= 0.6
     }
     if (player.knockbackEndTime) {
-      trailAlpha *= alpha
+      baseAlpha *= alpha
     }
 
-    let trailWidth = Math.max(2, 16 * (1 - i / points.length))
+    let baseWidth = Math.max(2, 16 * (1 - i / points.length))
     if (player.boosting) {
-      trailWidth *= 1.25
+      baseWidth *= 1.25
     }
-    g.lineStyle(trailWidth, color, trailAlpha)
+
+    // Outer glow layer
+    g.lineStyle(baseWidth * 1.8, color, baseAlpha * 0.2)
     g.moveTo(x1, screenY1)
     g.lineTo(x2, screenY2)
+
+    p1 = p2
+  }
+
+  // Pass 2: Middle layer
+  p1 = { lane: player.x, worldY: player.y, timestamp: 0 }
+  for (let i = 0; i < points.length; i++) {
+    const p2 = points[i]
+
+    const x1 = LANE_MARGIN + laneWidth * (p1.lane + 0.5)
+    const x2 = LANE_MARGIN + laneWidth * (p2.lane + 0.5)
+
+    const relY1 = p1.worldY - cameraY
+    const relY2 = p2.worldY - cameraY
+
+    const screenY1 = centerY - (relY1 / VISIBLE_TRACK_HEIGHT) * height + speedY
+    const screenY2 = centerY - (relY2 / VISIBLE_TRACK_HEIGHT) * height + speedY
+
+    const age = (now - p1.timestamp) / 1000
+    let baseAlpha = Math.max(0, 1 - age)
+    if (!player.boosting) {
+      baseAlpha *= 0.6
+    }
+    if (player.knockbackEndTime) {
+      baseAlpha *= alpha
+    }
+
+    let baseWidth = Math.max(2, 16 * (1 - i / points.length))
+    if (player.boosting) {
+      baseWidth *= 1.25
+    }
+
+    // Middle layer
+    g.lineStyle(baseWidth * 1.0, color, baseAlpha * 0.5)
+    g.moveTo(x1, screenY1)
+    g.lineTo(x2, screenY2)
+
+    p1 = p2
+  }
+
+  // Pass 3: Bright core (narrowest, most opaque)
+  p1 = { lane: player.x, worldY: player.y, timestamp: 0 }
+  for (let i = 0; i < points.length; i++) {
+    const p2 = points[i]
+
+    const x1 = LANE_MARGIN + laneWidth * (p1.lane + 0.5)
+    const x2 = LANE_MARGIN + laneWidth * (p2.lane + 0.5)
+
+    const relY1 = p1.worldY - cameraY
+    const relY2 = p2.worldY - cameraY
+
+    const screenY1 = centerY - (relY1 / VISIBLE_TRACK_HEIGHT) * height + speedY
+    const screenY2 = centerY - (relY2 / VISIBLE_TRACK_HEIGHT) * height + speedY
+
+    const age = (now - p1.timestamp) / 1000
+    let baseAlpha = Math.max(0, 1 - age)
+    if (!player.boosting) {
+      baseAlpha *= 0.6
+    }
+    if (player.knockbackEndTime) {
+      baseAlpha *= alpha
+    }
+
+    let baseWidth = Math.max(2, 16 * (1 - i / points.length))
+    if (player.boosting) {
+      baseWidth *= 1.25
+    }
+
+    // Bright core - use lightened color for extra pop
+    const coreColor = lightenColor(color, 0.3)
+    g.lineStyle(baseWidth * 0.4, coreColor, baseAlpha * 0.9)
+    g.moveTo(x1, screenY1)
+    g.lineTo(x2, screenY2)
+
     p1 = p2
   }
 }
@@ -338,7 +417,7 @@ function renderPlayer(
   const spriteImage =
     player.character != null && CHARACTER_SPRITES[player.character]
       ? CHARACTER_SPRITES[player.character]
-      : CHARACTER_SPRITES[PlayableCharacter.BLUE]
+      : DEFAULT_SPRITE
 
   // Apply color tint when boosting
   let tint = 0xffffff // White (no tint)
