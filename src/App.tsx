@@ -16,6 +16,9 @@ import RaceTrack from "./components/RaceTrack.tsx"
 import CharacterSelect from "./components/CharacterSelect.tsx"
 // import Notifications from "./components/Notifications.tsx"
 
+import trackTexturePath from "./assets/racetrack.png"
+import { Assets, Texture } from "pixi.js"
+
 // -----------------------------------------------------------------------------
 // Component
 // -----------------------------------------------------------------------------
@@ -23,8 +26,12 @@ import CharacterSelect from "./components/CharacterSelect.tsx"
 const App = () => {
   const [game, setGame] = useState<GameState>()
   const [yourPlayerId, setYourPlayerId] = useState<PlayerId | undefined>()
+  const [trackTexture, setTrackTexture] = useState<Texture | undefined>()
 
   useEffect(() => {
+    Assets.load(trackTexturePath).then(setTrackTexture)
+    setTrackTexture(Texture.from(trackTexturePath))
+
     Rune.initClient({
       onChange: ({ game, yourPlayerId }) => {
         setGame(game)
@@ -138,7 +145,13 @@ const App = () => {
               width={window.innerWidth}
               height={window.innerHeight}
             >
-              <RaceTrack game={game} cameraY={cameraY} />
+              {trackTexture && (
+                <RaceTrack
+                  game={game}
+                  cameraY={cameraY}
+                  trackTexture={trackTexture}
+                />
+              )}
               <Players
                 game={game}
                 yourPlayerId={yourPlayerId}
