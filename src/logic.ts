@@ -179,7 +179,7 @@ function setup(allPlayerIds: PlayerId[]): GameState {
   characters.sort(() => Math.random() - 0.5)
   allPlayerIds.forEach((playerId) => {
     players[playerId] = {
-      character: null,
+      character: characters.pop() || null,
       ready: false,
       x: lanes.splice(0, 1)[0], // Start in assigned lane
       y: -MAX_SPEED / 2,
