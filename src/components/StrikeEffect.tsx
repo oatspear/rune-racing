@@ -10,7 +10,7 @@ import { PlayableCharacter } from "../logic"
 interface StrikeEffectProps {
   x: number
   y: number
-  radius: number // Used for scaling
+  scale: number // Used for scaling
   time: number // Used for frame calculation
   character?: PlayableCharacter // Character type determines effect row
 }
@@ -24,7 +24,7 @@ const EFFECT_ROWS = {
   [PlayableCharacter.PURPLE]: 1, // row 1 for purple
 } as const
 
-const StrikeEffect = ({ x, y, radius, time, character }: StrikeEffectProps) => {
+const StrikeEffect = ({ x, y, scale, time, character }: StrikeEffectProps) => {
   // Create and cache textures from spritesheet
   const textures = useMemo(() => {
     const baseTexture = BaseTexture.from(strikeEffectImage)
@@ -56,11 +56,11 @@ const StrikeEffect = ({ x, y, radius, time, character }: StrikeEffectProps) => {
 
     return frames
   }, [character]) // Recreate textures when character changes
+
   const frame = Math.floor(time * FRAME_COUNT)
   const frameIndex = Math.min(frame, FRAME_COUNT - 1) // Don't loop, stay on last frame
 
   // Calculate sprite properties
-  const scale = (radius * 2) / SPRITE_SIZE // Scale to match the desired radius
   const anchorX = 0.5
   const anchorY = 0.5
 

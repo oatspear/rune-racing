@@ -9,18 +9,14 @@ import { PlayerId } from "rune-sdk"
 import {
   GameState,
   KNOCKBACK_RECOVERY_TIME_MS,
-  MAX_SPEED,
-  NUM_LANES,
   PlayableCharacter,
-  PLAYER_RADIUS,
   PlayerState,
 } from "../logic"
 
 import { Container, Graphics, Sprite, useApp } from "@pixi/react"
-import { PLAYER_COLORS, lightenColor } from "../client_constants"
+import { LANE_WIDTH_PX, PLAYER_COLORS, lightenColor } from "../client_constants"
 import { Graphics as PixiGraphics } from "@pixi/graphics"
 import { useRef } from "react"
-import { LANE_MARGIN, VISIBLE_TRACK_HEIGHT } from "../client_constants"
 import StrikeEffect from "./StrikeEffect"
 
 // Import character sprites
@@ -47,6 +43,9 @@ type PlayersProps = {
   game: GameState
   yourPlayerId?: PlayerId
   cameraY: number
+  xOffset: number
+  scale: number
+  screenHeightInGameUnits: number
 }
 
 type TrailPoint = {
@@ -64,12 +63,17 @@ type PlayerTrail = {
 // Component
 // -----------------------------------------------------------------------------
 
-const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
+const Players = ({
+  game,
+  yourPlayerId,
+  cameraY,
+  xOffset,
+  scale,
+  screenHeightInGameUnits,
+}: PlayersProps) => {
   const app = useApp()
-  const width = app.screen.width
   const height = app.screen.height
-  const laneWidth = (width - 2 * LANE_MARGIN) / NUM_LANES
-  const centerY = height / 2
+  const screenCenterY = height / 2
   const trailsRef = useRef<Record<PlayerId, PlayerTrail>>({})
   const strikeStartTimes = useRef<Record<string, number>>({})
 
@@ -83,6 +87,8 @@ const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
     }
   }
 
+  const scaledLaneWidth = LANE_WIDTH_PX * scale
+
   const renderStrikeEffects = () => {
     return Object.entries(game.players).map(([playerId, player]) => {
       if (
@@ -93,13 +99,11 @@ const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
         return null
       }
 
-      const lane = Math.max(0, Math.min(NUM_LANES - 1, player.x))
-      const x = LANE_MARGIN + laneWidth * (lane + 0.5)
+      const x = xOffset + scaledLaneWidth * (player.x + 0.5)
       const relativeY = player.y - cameraY
-      const y = centerY - (relativeY / VISIBLE_TRACK_HEIGHT) * height
-      const playerScreenRadius = (PLAYER_RADIUS / VISIBLE_TRACK_HEIGHT) * height
+      const y = screenCenterY - (relativeY / screenHeightInGameUnits) * height
 
-      if (Math.abs(relativeY) > VISIBLE_TRACK_HEIGHT / 2) return null
+      if (Math.abs(relativeY) > screenHeightInGameUnits / 2) return null
 
       const striker = game.players[game.lastStrike.strikerId]
       const strikeId = `${playerId}-${game.lastStrike.timestamp}`
@@ -119,7 +123,7 @@ const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
           key={`strike-${playerId}`}
           x={x}
           y={y}
-          radius={playerScreenRadius * 2}
+          scale={scale}
           time={normalizedTime}
           character={striker?.character ?? undefined}
         />
@@ -139,11 +143,13 @@ const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
         renderPlayer(
           playerId,
           player,
+          xOffset,
           cameraY,
           height,
-          laneWidth,
-          centerY,
-          trail,
+          scale,
+          scaledLaneWidth,
+          screenCenterY,
+          screenHeightInGameUnits,
           now
         )
       )
@@ -158,11 +164,13 @@ const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
         renderPlayer(
           yourPlayerId,
           player,
+          xOffset,
           cameraY,
           height,
-          laneWidth,
-          centerY,
-          trail,
+          scale,
+          scaledLaneWidth,
+          screenCenterY,
+          screenHeightInGameUnits,
           now
         )
       )
@@ -186,10 +194,12 @@ const Players = ({ game, yourPlayerId, cameraY }: PlayersProps) => {
             drawTrail(
               g,
               player,
+              xOffset,
               cameraY,
               height,
-              laneWidth,
-              centerY,
+              scaledLaneWidth,
+              screenCenterY,
+              screenHeightInGameUnits,
               trail,
               now
             )
@@ -223,7 +233,6 @@ function updateTrail(trail: PlayerTrail, player: PlayerState, now: number) {
     })
     trail.lastUpdate = now
     if (trail.points.length > 15) {
-      // Increased from 12 for smoother curves
       trail.points.pop()
     }
   } else if (player.knockbackEndTime) {
@@ -238,7 +247,7 @@ function getCurvePoints(
   if (points.length < 2) return points
 
   const curvePoints: { x: number; y: number }[] = []
-  const segmentsPerCurve = 8 // Number of interpolated points between each pair
+  const segmentsPerCurve = 8
 
   for (let i = 0; i < points.length - 1; i++) {
     const p0 = points[Math.max(0, i - 1)]
@@ -269,7 +278,6 @@ function getCurvePoints(
     }
   }
 
-  // Add the last point
   if (points.length > 0) {
     curvePoints.push(points[points.length - 1])
   }
@@ -280,24 +288,22 @@ function getCurvePoints(
 function drawTrail(
   g: PixiGraphics,
   player: PlayerState,
+  xOffset: number,
   cameraY: number,
   height: number,
   laneWidth: number,
   centerY: number,
+  screenHeightInGameUnits: number,
   trail: PlayerTrail,
   now: number
 ) {
   const relativeY = player.y - cameraY
-  if (Math.abs(relativeY) > VISIBLE_TRACK_HEIGHT / 2) {
+  if (Math.abs(relativeY) > screenHeightInGameUnits / 2) {
     return
   }
 
-  let speedY = 0
-
   if (player.knockbackEndTime) {
     return // Don't draw trail during knockback
-  } else {
-    speedY = player.boosting ? 40 : (player.speed / MAX_SPEED) * 40
   }
 
   let color =
@@ -312,18 +318,17 @@ function drawTrail(
   const screenPoints: { x: number; y: number; age: number }[] = []
 
   // Add current player position as the first point (age 0)
-  const currentX = LANE_MARGIN + laneWidth * (player.x + 0.5)
+  const currentX = xOffset + laneWidth * (player.x + 0.5)
   const currentRelY = player.y - cameraY
-  const currentY =
-    centerY - (currentRelY / VISIBLE_TRACK_HEIGHT) * height + speedY
+  const currentY = centerY - (currentRelY / screenHeightInGameUnits) * height
   screenPoints.push({ x: currentX, y: currentY, age: 0 })
 
   // Add trail points
   for (let i = 0; i < trail.points.length; i++) {
     const point = trail.points[i]
-    const x = LANE_MARGIN + laneWidth * (point.lane + 0.5)
+    const x = xOffset + laneWidth * (point.lane + 0.5)
     const relY = point.worldY - cameraY
-    const y = centerY - (relY / VISIBLE_TRACK_HEIGHT) * height + speedY
+    const y = centerY - (relY / screenHeightInGameUnits) * height
     const age = (now - point.timestamp) / 1000
     screenPoints.push({ x, y, age })
   }
@@ -383,34 +388,33 @@ function drawTrail(
 function renderPlayer(
   playerId: PlayerId,
   player: PlayerState,
+  xOffset: number,
   cameraY: number,
   height: number,
-  laneWidth: number,
+  scale: number,
+  scaledLaneWidth: number,
   centerY: number,
-  trail: PlayerTrail,
+  screenHeightInGameUnits: number,
   now: number
 ) {
-  const lane = Math.max(0, Math.min(NUM_LANES - 1, player.x))
-  const x = LANE_MARGIN + laneWidth * (lane + 0.5)
+  const laneCentered = player.x + 0.5
+  const x = xOffset + scaledLaneWidth * laneCentered
   const relativeY = player.y - cameraY
 
-  if (Math.abs(relativeY) > VISIBLE_TRACK_HEIGHT / 2) {
+  if (Math.abs(relativeY) > screenHeightInGameUnits / 2) {
     return null
   }
 
-  let speedY = 0
   let alpha = 1
 
   if (player.knockbackEndTime) {
     const knockbackProgress =
       (player.knockbackEndTime - now) / KNOCKBACK_RECOVERY_TIME_MS
     alpha = Math.cos(knockbackProgress * Math.PI * 4) * 0.5 + 0.5
-  } else {
-    speedY = player.boosting ? 40 : (player.speed / MAX_SPEED) * 40
   }
 
-  const y = centerY - (relativeY / VISIBLE_TRACK_HEIGHT) * height + speedY
-  const playerScreenRadius = (PLAYER_RADIUS / VISIBLE_TRACK_HEIGHT) * height
+  // Pure coordinate conversion - no speedY offset
+  const y = centerY - (relativeY / screenHeightInGameUnits) * height
 
   // Get sprite image based on character
   const spriteImage =
@@ -435,8 +439,7 @@ function renderPlayer(
       x={x}
       y={y}
       anchor={0.5}
-      width={playerScreenRadius * 2}
-      height={playerScreenRadius * 2}
+      scale={scale}
       alpha={alpha}
       tint={tint}
     />

@@ -11,17 +11,19 @@ import type { PlayerId, RuneClient } from "rune-sdk"
 // Constants
 // -----------------------------------------------------------------------------
 
-const TRACK_LENGTH = 2400
-export const MAX_SPEED = 240 // units per second
+export const PLAYER_RADIUS = 8
+export const OBSTACLE_RADIUS = 8
+const COLLISION_THRESHOLD = PLAYER_RADIUS + OBSTACLE_RADIUS
+
+export const MAX_SPEED = PLAYER_RADIUS * 30 // units per second
 export const BOOST_SPEED = MAX_SPEED * 1.5 // units per second
 const ACCELERATION = MAX_SPEED / 1.5 // reach max speed in 1.5 seconds
+const TRACK_LENGTH = MAX_SPEED * 10
 
 export const NUM_LANES = 5 // Total lanes available (0-4)
 const MAX_LANE = NUM_LANES - 1 // Maximum lane index (4)
 
-export const PLAYER_RADIUS = 10
-export const OBSTACLE_RADIUS = 10
-const COLLISION_THRESHOLD = PLAYER_RADIUS + OBSTACLE_RADIUS
+export const VISION_RANGE = MAX_SPEED * 3 // How far ahead players can see (3 seconds at max speed)
 
 const QUEUED_ACTION_DURATION = 800
 

@@ -6,18 +6,16 @@
 // -----------------------------------------------------------------------------
 
 import { Stage } from "@pixi/react"
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState } from "react"
 import { PlayerId } from "rune-sdk"
 import { GameState, GamePhase } from "./logic.ts"
-import Players from "./components/Players.tsx"
-import { VISIBLE_TRACK_HEIGHT } from "./client_constants.ts"
 import ScoreHUD from "./components/ScoreHUD.tsx"
-import RaceTrack from "./components/RaceTrack.tsx"
 import CharacterSelect from "./components/CharacterSelect.tsx"
 // import Notifications from "./components/Notifications.tsx"
 
 import trackTexturePath from "./assets/racetrack.png"
 import { Assets, Texture } from "pixi.js"
+import GameCanvas from "./components/GameCanvas.tsx"
 
 // -----------------------------------------------------------------------------
 // Component
@@ -40,95 +38,6 @@ const App = () => {
     })
   }, [])
 
-  // Calculate camera position based on player position
-  const cameraY = useMemo(() => {
-    if (!game || !yourPlayerId || !game.players[yourPlayerId]) return 0
-
-    const player = game.players[yourPlayerId]
-    // We want the player at 5/6 down the screen
-    // Camera is at the center, so we need to offset from player position by how far up from center the player should be
-    // 5/6 of screen height = 1/3 down from center
-    // Since the RaceTrack inverts Y coordinates, we need to ADD to move the player down
-    return player.y + VISIBLE_TRACK_HEIGHT / 6 // Move camera down from player position
-  }, [game, yourPlayerId])
-
-  useEffect(() => {
-    // Handle swipe gestures and mouse drag for lane changes
-    let touchStartX = 0
-    let touchEndX = 0
-    let touchActive = false
-    let mouseStartX = 0
-    let mouseEndX = 0
-    let mouseActive = false
-
-    function onTouchStart(e: TouchEvent) {
-      if (e.touches.length === 1) {
-        touchActive = true
-        touchStartX = e.touches[0].clientX
-        touchEndX = touchStartX
-      }
-    }
-    function onTouchMove(e: TouchEvent) {
-      if (touchActive && e.touches.length === 1) {
-        touchEndX = e.touches[0].clientX
-      }
-    }
-    function onTouchEnd() {
-      if (!touchActive) return
-      const dx = touchEndX - touchStartX
-      if (Math.abs(dx) > 24) {
-        if (dx < 0) {
-          Rune.actions.turnLeft()
-        } else {
-          Rune.actions.turnRight()
-        }
-      }
-      touchActive = false
-      touchStartX = 0
-      touchEndX = 0
-    }
-
-    function onMouseDown(e: MouseEvent) {
-      mouseActive = true
-      mouseStartX = e.clientX
-      mouseEndX = mouseStartX
-    }
-    function onMouseMove(e: MouseEvent) {
-      if (mouseActive) {
-        mouseEndX = e.clientX
-      }
-    }
-    function onMouseUp() {
-      if (!mouseActive) return
-      const dx = mouseEndX - mouseStartX
-      if (Math.abs(dx) > 16) {
-        if (dx < 0) {
-          Rune.actions.turnLeft()
-        } else {
-          Rune.actions.turnRight()
-        }
-      }
-      mouseActive = false
-      mouseStartX = 0
-      mouseEndX = 0
-    }
-
-    window.addEventListener("touchstart", onTouchStart)
-    window.addEventListener("touchmove", onTouchMove)
-    window.addEventListener("touchend", onTouchEnd)
-    window.addEventListener("mousedown", onMouseDown)
-    window.addEventListener("mousemove", onMouseMove)
-    window.addEventListener("mouseup", onMouseUp)
-    return () => {
-      window.removeEventListener("touchstart", onTouchStart)
-      window.removeEventListener("touchmove", onTouchMove)
-      window.removeEventListener("touchend", onTouchEnd)
-      window.removeEventListener("mousedown", onMouseDown)
-      window.removeEventListener("mousemove", onMouseMove)
-      window.removeEventListener("mouseup", onMouseUp)
-    }
-  }, [])
-
   if (!game) {
     return null
   }
@@ -145,17 +54,10 @@ const App = () => {
               width={window.innerWidth}
               height={window.innerHeight}
             >
-              {trackTexture && (
-                <RaceTrack
-                  game={game}
-                  cameraY={cameraY}
-                  trackTexture={trackTexture}
-                />
-              )}
-              <Players
+              <GameCanvas
                 game={game}
                 yourPlayerId={yourPlayerId}
-                cameraY={cameraY}
+                trackTexture={trackTexture}
               />
             </Stage>
             <ScoreHUD game={game} yourPlayerId={yourPlayerId} />
