@@ -31,9 +31,19 @@ interface GameCanvasProps {
   game: GameState
   yourPlayerId: PlayerId | undefined
   trackTexture: Texture | undefined
+  softObstacleTexture: Texture | undefined
+  hardObstacleTexture: Texture | undefined
+  pickupTexture: Texture | undefined
 }
 
-const GameCanvas = ({ game, yourPlayerId, trackTexture }: GameCanvasProps) => {
+const GameCanvas = ({
+  game,
+  yourPlayerId,
+  trackTexture,
+  softObstacleTexture,
+  hardObstacleTexture,
+  pickupTexture,
+}: GameCanvasProps) => {
   const app = useApp()
 
   const scale = useMemo(
@@ -81,16 +91,22 @@ const GameCanvas = ({ game, yourPlayerId, trackTexture }: GameCanvasProps) => {
 
   return (
     <>
-      {trackTexture && (
-        <RaceTrack
-          game={game}
-          cameraY={cameraY}
-          trackTexture={trackTexture}
-          xOffset={xOffset}
-          scale={scale}
-          screenHeightInGameUnits={screenHeightInGameUnits}
-        />
-      )}
+      {trackTexture &&
+        softObstacleTexture &&
+        hardObstacleTexture &&
+        pickupTexture && (
+          <RaceTrack
+            game={game}
+            cameraY={cameraY}
+            trackTexture={trackTexture}
+            xOffset={xOffset}
+            scale={scale}
+            screenHeightInGameUnits={screenHeightInGameUnits}
+            softObstacleTexture={softObstacleTexture}
+            hardObstacleTexture={hardObstacleTexture}
+            pickupTexture={pickupTexture}
+          />
+        )}
       <Players
         game={game}
         yourPlayerId={yourPlayerId}

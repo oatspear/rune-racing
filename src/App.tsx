@@ -5,17 +5,21 @@
 // Imports
 // -----------------------------------------------------------------------------
 
+import { Assets, Texture } from "pixi.js"
 import { Stage } from "@pixi/react"
 import { useEffect, useState } from "react"
 import { PlayerId } from "rune-sdk"
+
 import { GameState, GamePhase } from "./logic.ts"
+import GameCanvas from "./components/GameCanvas.tsx"
 import ScoreHUD from "./components/ScoreHUD.tsx"
 import CharacterSelect from "./components/CharacterSelect.tsx"
 // import Notifications from "./components/Notifications.tsx"
 
 import trackTexturePath from "./assets/racetrack.png"
-import { Assets, Texture } from "pixi.js"
-import GameCanvas from "./components/GameCanvas.tsx"
+import crateTexturePath from "./assets/crate.png"
+import gemTexturePath from "./assets/gem.png"
+import wallTexturePath from "./assets/rock.png"
 
 // -----------------------------------------------------------------------------
 // Component
@@ -25,10 +29,17 @@ const App = () => {
   const [game, setGame] = useState<GameState>()
   const [yourPlayerId, setYourPlayerId] = useState<PlayerId | undefined>()
   const [trackTexture, setTrackTexture] = useState<Texture | undefined>()
+  const [crateTexture, setCrateTexture] = useState<Texture | undefined>()
+  const [wallTexture, setWallTexture] = useState<Texture | undefined>()
+  const [gemTexture, setGemTexture] = useState<Texture | undefined>()
 
   useEffect(() => {
     Assets.load(trackTexturePath).then(setTrackTexture)
-    setTrackTexture(Texture.from(trackTexturePath))
+    Assets.load(crateTexturePath).then(setCrateTexture)
+    Assets.load(wallTexturePath).then(setWallTexture)
+    Assets.load(gemTexturePath).then(setGemTexture)
+
+    //setTrackTexture(Texture.from(trackTexturePath))
 
     Rune.initClient({
       onChange: ({ game, yourPlayerId }) => {
@@ -58,6 +69,9 @@ const App = () => {
                 game={game}
                 yourPlayerId={yourPlayerId}
                 trackTexture={trackTexture}
+                softObstacleTexture={crateTexture}
+                hardObstacleTexture={wallTexture}
+                pickupTexture={gemTexture}
               />
             </Stage>
             <ScoreHUD game={game} yourPlayerId={yourPlayerId} />

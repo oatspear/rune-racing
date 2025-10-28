@@ -10,15 +10,15 @@
 // Imports
 // -----------------------------------------------------------------------------
 
-import { TilingSprite, Graphics, useApp } from "@pixi/react"
+import { TilingSprite, useApp, Sprite } from "@pixi/react"
 import { Texture } from "pixi.js"
 import { GameState } from "../logic"
 import {
   CLIENT_SCALING_FACTOR,
   LANE_WIDTH_PX,
-  OBSTACLE_RADIUS_PX,
   TRACK_WIDTH_PX,
 } from "../client_constants"
+import { useMemo } from "react"
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -36,6 +36,9 @@ type TrackProps = {
   xOffset: number
   scale: number
   screenHeightInGameUnits: number
+  softObstacleTexture: Texture
+  hardObstacleTexture: Texture
+  pickupTexture: Texture
 }
 
 // -----------------------------------------------------------------------------
@@ -49,6 +52,9 @@ const RaceTrack = ({
   xOffset,
   scale,
   screenHeightInGameUnits,
+  softObstacleTexture,
+  hardObstacleTexture,
+  pickupTexture,
 }: TrackProps) => {
   const app = useApp()
   const screenWidth = app.screen.width
@@ -69,6 +75,9 @@ const RaceTrack = ({
   // Calculate lane positioning for obstacles/pickups
   const centerY = screenHeight / 2
 
+  const anchorParam = useMemo(() => ({ x: 0.5, y: 0.5 }), [])
+  const scaleParam = useMemo(() => ({ x: scale, y: scale }), [scale])
+
   return (
     <>
       {/* Tiling Background */}
@@ -77,83 +86,65 @@ const RaceTrack = ({
         width={screenWidth}
         height={screenHeight}
         tilePosition={{ x: -tileOffsetX, y: tileYInPixels }}
-        tileScale={{ x: scale, y: scale }}
+        tileScale={scaleParam}
         anchor={{ x: 0, y: 0 }}
         position={{ x: 0, y: 0 }}
       />
 
       {/* Overlays: Pickups and Obstacles */}
-      <Graphics
-        draw={(g) => {
-          g.clear()
+      {game.pickups.map((pickup, index) => {
+        const x = xOffset + scaledLaneWidth * (pickup.x + 0.5)
+        const relativeY = pickup.y - cameraY
+        const screenY =
+          centerY - (relativeY / screenHeightInGameUnits) * screenHeight
 
-          // Draw pickups
-          const pickupScreenRadius = OBSTACLE_RADIUS_PX * scale
-          game.pickups.forEach((pickup) => {
-            const x = xOffset + scaledLaneWidth * (pickup.x + 0.5)
-            const relativeY = pickup.y - cameraY
-            const screenY =
-              centerY - (relativeY / screenHeightInGameUnits) * screenHeight
+        if (screenY >= -50 && screenY <= screenHeight + 50) {
+          return (
+            <Sprite
+              key={`g${index}`}
+              texture={pickupTexture}
+              x={x}
+              y={screenY}
+              anchor={anchorParam}
+              scale={scaleParam}
+            />
+          )
+        }
+        return null
+      })}
 
-            if (screenY >= -50 && screenY <= screenHeight + 50) {
-              g.lineStyle(0)
-              g.beginFill(0xffd700)
-              g.drawCircle(x, screenY, pickupScreenRadius / 2)
-              g.endFill()
-            }
-          })
+      {game.obstacles.map((obstacle, index) => {
+        const x = xOffset + scaledLaneWidth * (obstacle.x + 0.5)
+        const relativeY = obstacle.y - cameraY
+        const screenY =
+          centerY - (relativeY / screenHeightInGameUnits) * screenHeight
 
-          // Draw obstacles
-          const obstacleScreenSize = OBSTACLE_RADIUS_PX * scale
-          game.obstacles.forEach((obstacle) => {
-            const x = xOffset + scaledLaneWidth * (obstacle.x + 0.5)
-            const relativeY = obstacle.y - cameraY
-            const screenY =
-              centerY - (relativeY / screenHeightInGameUnits) * screenHeight
-
-            if (screenY >= -50 && screenY <= screenHeight + 50) {
-              if (obstacle.indestructible) {
-                g.lineStyle(3, 0x444444)
-                g.beginFill(0x888888)
-                g.drawRect(
-                  x - obstacleScreenSize / 2,
-                  screenY - obstacleScreenSize / 2,
-                  obstacleScreenSize,
-                  obstacleScreenSize
-                )
-                g.lineStyle(2, 0x444444)
-                g.moveTo(
-                  x - obstacleScreenSize / 3,
-                  screenY - obstacleScreenSize / 3
-                )
-                g.lineTo(
-                  x + obstacleScreenSize / 3,
-                  screenY + obstacleScreenSize / 3
-                )
-                g.moveTo(
-                  x + obstacleScreenSize / 3,
-                  screenY - obstacleScreenSize / 3
-                )
-                g.lineTo(
-                  x - obstacleScreenSize / 3,
-                  screenY + obstacleScreenSize / 3
-                )
-                g.endFill()
-              } else {
-                g.lineStyle(2, 0xff4444)
-                g.beginFill(0xff6666)
-                g.drawRect(
-                  x - obstacleScreenSize / 2,
-                  screenY - obstacleScreenSize / 2,
-                  obstacleScreenSize,
-                  obstacleScreenSize
-                )
-                g.endFill()
-              }
-            }
-          })
-        }}
-      />
+        if (screenY >= -50 && screenY <= screenHeight + 50) {
+          if (obstacle.indestructible) {
+            return (
+              <Sprite
+                key={`w${index}`}
+                texture={hardObstacleTexture}
+                x={x}
+                y={screenY}
+                anchor={anchorParam}
+                scale={scaleParam}
+              />
+            )
+          } else {
+            return (
+              <Sprite
+                key={`c${index}`}
+                texture={softObstacleTexture}
+                x={x}
+                y={screenY}
+                anchor={anchorParam}
+                scale={scaleParam}
+              />
+            )
+          }
+        }
+      })}
     </>
   )
 }
