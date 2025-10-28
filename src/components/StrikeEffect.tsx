@@ -70,7 +70,7 @@ const StrikeEffect = ({ x, y, scale, time, character }: StrikeEffectProps) => {
       x={x}
       y={y}
       anchor={{ x: anchorX, y: anchorY }}
-      scale={{ x: scale, y: scale }}
+      scale={{ x: 2 * scale, y: 2 * scale }}
     />
   )
 }
