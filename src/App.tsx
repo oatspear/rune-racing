@@ -16,7 +16,7 @@ import ScoreHUD from "./components/ScoreHUD.tsx"
 import CharacterSelect from "./components/CharacterSelect.tsx"
 // import Notifications from "./components/Notifications.tsx"
 
-import trackTexturePath from "./assets/racetrack.png"
+import trackTexturePath from "./assets/racetrack2.png"
 import crateTexturePath from "./assets/crate.png"
 import gemTexturePath from "./assets/gem.png"
 import wallTexturePath from "./assets/rock.png"

@@ -13,7 +13,7 @@ import type { PlayerId, RuneClient } from "rune-sdk"
 
 export const PLAYER_RADIUS = 8
 export const OBSTACLE_RADIUS = 8
-const COLLISION_THRESHOLD = PLAYER_RADIUS + OBSTACLE_RADIUS
+const COLLISION_THRESHOLD = (((PLAYER_RADIUS + OBSTACLE_RADIUS) / 2) * 1.5) | 0
 
 export const MAX_SPEED = PLAYER_RADIUS * 30 // units per second
 export const BOOST_SPEED = MAX_SPEED * 1.5 // units per second
@@ -252,7 +252,10 @@ function updatePlayer(
       hasCollision = true
       if (obstacle.indestructible) {
         // Indestructible obstacles cause knockback and stop boosting
-        applyKnockback(player, currentTime)
+        // applyKnockback(player, currentTime)
+        player.speed = 0
+        // Ensure boosting stays off during knockback
+        player.boosting = false
       } else {
         game.obstacles.splice(i, 1)
         if (!player.boosting) {
